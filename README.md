@@ -305,8 +305,10 @@ Both regressions compare against the reference images in `tb/golden/` (made by t
 - **Two independent testbenches**: the C++ harness (`make test`) and the SystemVerilog testbench
   (`tb/run_tests.sh`) run the same 3,060 checks (1,926 + 234 + 900) and both pass all of them on
   Verilator (2026-10-10); on Vivado's
-  xsim the SystemVerilog testbench passes a 396-run subset of the compact and fast cores (MCU and
-  raster output, smoothing, malformed files) and 264 runs of the wide and fast cores. xsim's stricter
+  xsim the SystemVerilog testbench passed a 396-run subset of the compact and fast cores (MCU and
+  raster output, smoothing, malformed files) and 264 runs of the wide and fast cores (2026-10-04), and
+  on the RTL with the review's fixes all 510 runs of the wide, fast and compact cores in MCU order
+  without stalls (321 + 39 + 150, 2026-10-10, `tb/regression_xsim_2026-10-10.txt`). xsim's stricter
   4-state semantics found problems that Verilator, Quartus and the hardware never showed: a loop
   counter shared by several `always` blocks, a signal used in a port connection before its
   declaration, and unreset valid bits in the wide core's IDCT pipeline (all fixed); and an xsim bug

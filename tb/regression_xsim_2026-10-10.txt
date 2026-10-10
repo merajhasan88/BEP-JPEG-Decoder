@@ -1,0 +1,9 @@
+building wmcu (xsim) ...
+building fmcu (xsim) ...
+building mcu (xsim) ...
+TEST FILES 321/321 passed
+STREAM TESTS 39/39 passed
+MALFORMED 150/150 passed
+ALL PASSED
+rc=0
+# 2026-10-10, tb/run_tests.sh -s xsim --quick --configs wmcu,fmcu,mcu (Vivado 2026.1 xsim, no stall runs), RTL of c68ac30 (unchanged since)
