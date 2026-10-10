@@ -93,23 +93,25 @@ def ffmpeg_bench(path, w, h):
     data = open(path, "rb").read()
     n_big = max(20, min(400, int(3e8 // (w * h))))     # ~0.3 Gpixel of work
     n_small = n_big // 4
-    times = {}
+    times, clks = {}, {}
     for n in (n_small, n_big):
         fn = f"{SCR}/ffmpeg_{n}.mjpg"
         with open(fn, "wb") as f:
             for _ in range(n): f.write(data)
-        best = 1e9
+        best, best_clk = 1e9, None
         for _ in range(3):
             t0 = time.perf_counter()
             r = run(pinned(["ffmpeg", "-hide_banner", "-loglevel", "error", "-threads", "1", "-f", "mjpeg",
                             "-i", fn, "-pix_fmt", "rgb24", "-f", "null", "-"]))   # RGB out, like the others
-            best = min(best, time.perf_counter() - t0)
-            clk = ghz()
+            dt = time.perf_counter() - t0
+            clk = ghz()                                  # sampled right after this trial
             if r.returncode: return None
-        times[n] = best
+            if dt < best: best, best_clk = dt, clk       # the clock goes with the trial that is kept
+        times[n], clks[n] = best, best_clk
         os.remove(fn)
     per = (times[n_big] - times[n_small]) / (n_big - n_small)
-    return dict(w=w, h=h, ms=per * 1e3, mpx_s=w * h / per / 1e6, n=n_big, uj=-1, ghz=clk)
+    # (before 2026-10-10 the clock of the last trial was returned, whichever trial was fastest)
+    return dict(w=w, h=h, ms=per * 1e3, mpx_s=w * h / per / 1e6, n=n_big, uj=-1, ghz=clks[n_big])
 
 def main():
     want = os.environ.get("BENCH_POWER_PROFILE")
