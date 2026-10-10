@@ -171,5 +171,6 @@ Owner: "In parallel (pun intended) lets find a way around Huffman loop limitatio
     start and done. Tests against an AXI4 memory model with random gaps on every channel: lane 1,240 /
     1,240 jobs (corpus, the 50 malformed cases, data after the EOI, no SOI, mid-frame aborts, output
     overflow; two widths, four gap settings), engine 620 / 620 jobs in four batches as a host would run
-    them. Option 2 would replace the lanes' read side only; the registers stay. Not built: the shell,
+    them; the 24 photo files as one batch on 4 lanes, all identical to libjpeg 9e, in 1.013 (largest
+    first) to 1.039 (file order) times the lower bound of the engine clock (memory bandwidth not modelled). Option 2 would replace the lanes' read side only; the registers stay. Not built: the shell,
     HBM and clocking, the host program (on AWS's build image, after the owner's choice).

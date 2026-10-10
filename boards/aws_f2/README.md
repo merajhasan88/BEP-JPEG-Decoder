@@ -19,8 +19,15 @@ python3 run_lane_tests.py [--photos ../../../test_images/adapter.jpg ...]
 python3 run_engine_tests.py [--photos ...]
 ```
 
-Results (2026-10-10): lane 1,240/1,240 jobs (155 per list x 2 widths x 4 gap settings); engine 620/620 jobs
-in 4 batches (4 x 512 and 3 x 256 bits, both orders, with and without gaps) with every check passed.
+Results (2026-10-10): lane 1,246/1,246 jobs (155 per list x 2 widths x 4 gap settings, and 3 photos at
+both widths with 30 % gaps: identical to libjpeg 9e, the decoder never waited for the writer); engine
+620/620 jobs in 4 batches (4 x 512 and 3 x 256 bits, both orders, with and without gaps) with every check
+passed. The 24 photo files (the 12 photos and their 4:2:0 copies) as one batch on 4 lanes of 512 bits, all
+identical to libjpeg 9e: 29.79 M engine clocks from the first start to the last done in file order, 29.04 M
+largest file first, against a lower bound of 28.68 M (the lanes' work divided by 4): 1.039 and 1.013 times
+the bound, lanes busy 96 and 99 %. Assumptions: a memory with no bandwidth limit (40-80 clocks of read
+latency, gaps only in the corpus batches), 100 clocks per register access. At F2's 250 MHz (not
+measured) the 29.04 M clocks would be 116 ms; the records are 4 bytes per pixel (2.7 GB/s per lane here).
 Found by these tests and fixed: a job's late read data could reach the next job when the frame ended
 before the file did; a mid-frame abort left a pixel beat in the decoder that the next job counted in the
 clock before the decoder's reset acted (the lane now ignores the decoder in that clock; with the fix
