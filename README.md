@@ -324,7 +324,9 @@ Both regressions compare against the reference images in `tb/golden/` (made by t
   and length field, mid-payload, around the scan's restart markers, before and inside the EOI - each
   followed by a valid image in the same decoder without a reset, x 9 configurations x 2 stall settings =
   **4,140 runs**: a cut file of 3 bytes or more ends with its own frame and ERR_TRUNC, a 1-2 byte cut
-  (no frame header) starts no frame, the next image is exact, nothing hangs.
+  (no frame header) starts no frame, the next image is exact, nothing hangs. The same script streams
+  each of the 50 malformed files followed by a valid image (**900 runs**): its own error bits, the next
+  image exact.
 - **Colour converter**: exhaustive over all 2^24 (Y,Cb,Cr) inputs for both constant sets.
 - **On hardware**: on the EP2C5 every test photo decodes with libjpeg's checksum and exactly the
   simulated clock count (`boards/ep2c5/fpga_jtag`; re-run 2026-10-10 with the review fixes: the 12 photos

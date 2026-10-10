@@ -9,8 +9,10 @@ a cut file of 1 or 2 bytes (its SOI incomplete, or only the SOI: no frame header
 (in_last at or before the SOI has no effect, jpeg_parser.sv); the valid image after it matches its golden
 with err = 0. (Vmulti waits for one frame per file: for the 1-2 byte cuts the valid image's golden is given
 first and the run ends by Vmulti's no-progress limit after that one frame: "frames: 1" is the pass.)
+Second part: each of the 50 tb/malformed files followed by the same valid image: the malformed file's frame
+must carry the bits of cases.json (and no pixels where it says so), the valid image after it must be exact.
 usage: run_trunc_tests.py [--configs=a,b] [--quick]      (needs obj_<cfg>/Vmulti: make multi)"""
-import os, re, sys, subprocess
+import json, os, re, sys, subprocess
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 from run_tests import CONFIGS
@@ -59,7 +61,8 @@ def main():
                 with open(f, "wb") as fh: fh.write(d[:p])
             files.append((b, p, f))
     nxt = os.path.join(HERE, "corpus", NEXT + ".jpg")
-    total = fails = 0; no_frame = 0
+    total = fails = 0; no_frame = 0; mtotal = mfails = 0
+    cases = json.load(open(os.path.join(HERE, "malformed", "cases.json")))
     for cfg, cv in configs.items():
         raster, fancy, rb, has_rgb = cv[:4]
         fmt = "rgb" if has_rgb else "ycbcr"
@@ -83,11 +86,25 @@ def main():
                     fails += 1
                     if fails <= 40:
                         print(f"FAIL {cfg:7s} stall={stall:2d} {b} cut at {p}:\n   " + r.stdout.strip().replace("\n", "\n   "))
+        # the malformed files, each followed by the valid image
+        for name, c in sorted(cases.items()):
+            f = os.path.join(HERE, "malformed", name + ".jpg")
+            for stall in ((30,) if quick else (0, 30)):
+                r = subprocess.run([binp, "--fmt", fmt, "--stall", str(stall), f, "-", nxt, g], capture_output=True, text=True, timeout=600)
+                fr = re.findall(r"frame (\d+): (\d+)x(\d+), (\d+) pixels, err=0x([0-9a-f]+), (.*)", r.stdout)
+                ok = len(fr) == 2 and (int(fr[0][4], 16) & c["err"]) == c["err"] and (c["pixels"] or int(fr[0][3]) == 0) \
+                     and int(fr[1][4], 16) == 0 and fr[1][5].strip() == "MATCH"
+                mtotal += 1
+                if not ok:
+                    mfails += 1
+                    if mfails <= 20:
+                        print(f"FAIL {cfg:7s} stall={stall:2d} malformed {name} then {NEXT}:\n   " + r.stdout.strip().replace("\n", "\n   "))
         print(f"done {cfg}", flush=True)
     print(f"cut files: {len(files)} ({', '.join(f'{b}: {sum(1 for x in files if x[0] == b)}' for b in BASES)}); "
           f"runs of 1-2 byte cuts (no frame, the next image exact): {no_frame}")
     print(f"TRUNCATION TESTS {total - fails}/{total} passed" + ("" if not fails else f"  ({fails} FAILED)"))
-    return 1 if fails else 0
+    print(f"MALFORMED THEN VALID {mtotal - mfails}/{mtotal} passed" + ("" if not mfails else f"  ({mfails} FAILED)"))
+    return 1 if fails or mfails else 0
 
 if __name__ == "__main__":
     sys.exit(main())
