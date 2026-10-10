@@ -268,6 +268,7 @@ class Decoder:
         self.upsample, self.cc, self.out, self.crosscheck = upsample, cc, out, crosscheck
         self.qt = {}; self.dc = {}; self.ac = {}; self.ri = 0
         self.frame = None; self.nblocks_dumped = 0
+        self.saw_jfif = self.saw_adobe = False; self.adobe_transform = None   # libjpeg examine_app0/app14
     def u16(self, p): return (self.data[p] << 8) | self.data[p+1]
     def run(self):
         d = self.data; p = 0
@@ -284,6 +285,11 @@ class Decoder:
             elif m in (0xC1,0xC2,0xC3,0xC5,0xC6,0xC7,0xC9,0xCA,0xCB,0xCD,0xCE,0xCF):
                 raise ValueError("unsupported SOF type FF%02X (only baseline SOF0)" % m)
             elif m == 0xDD: self.ri = self.u16(p+2)
+            elif m == 0xE0 and len(seg) >= 14 and seg[:5] == b"JFIF\0": self.saw_jfif = True
+            elif m == 0xEE and len(seg) >= 12 and seg[:5] == b"Adobe":
+                self.saw_adobe = True; self.adobe_transform = seg[11]
+            elif m == 0xF8:
+                raise ValueError("unsupported: LSE marker (libjpeg 9 colour transform)")
             elif m == 0xDA:
                 p = self.decode_scan(seg, p + L); continue
             # APPn, COM, DNL, etc: skip
@@ -391,12 +397,29 @@ class Decoder:
         while not (self.data[p] == 0xFF and self.data[p+1] != 0 and not (0xD0 <= self.data[p+1] <= 0xD7)): p += 1
         return p
 
+    def colour_space(self):
+        """libjpeg 9e jdapimin.c default_decompress_parms for 3 components: component IDs first, then the
+        JFIF APP0, then the Adobe APP14 transform; 'ycc' or 'rgb' (big-gamut IDs are not supported)"""
+        comps = self.frame['comps']
+        if len(comps) != 3: return 'ycc'
+        ids = tuple(c['id'] for c in comps)
+        if ids == (1, 2, 3): return 'ycc'
+        if ids in ((1, 0x22, 0x23), (0x72, 0x67, 0x62)):
+            raise ValueError("unsupported: libjpeg 9 big-gamut colour space (component IDs %r)" % (ids,))
+        if ids == (0x52, 0x47, 0x42): return 'rgb'
+        if self.saw_jfif: return 'ycc'
+        if self.saw_adobe and self.adobe_transform == 0: return 'rgb'
+        return 'ycc'
+
     def output(self):
         """rgb  : P6 R,G,B (grey images: P5 Y, like djpeg)
            ycbcr: P6 Y,Cb,Cr after upsampling, no colour conversion (grey images: Y,128,128)
            y    : P5 luma only (component 0), chroma never needed"""
         f = self.frame; W, H = f['W'], f['H']; comps = f['comps']
         hmax, vmax = f['hmax'], f['vmax']
+        rgb = self.colour_space() == 'rgb'
+        if rgb and self.out != 'rgb':
+            raise ValueError("unsupported: %s output of an RGB image (the decoder gives RGB only)" % self.out)
         use = comps[:1] if (self.out == 'y' or len(comps) == 1) else comps
         assert len(comps) in (1, 3), "only 1- or 3-component images"
         planes = []
@@ -414,7 +437,7 @@ class Decoder:
         n = W * H; out = bytearray(3 * n)
         if len(planes) == 1:                                     # grey image, ycbcr output
             out[0::3] = planes[0]; out[1::3] = bytes([128]) * n; out[2::3] = bytes([128]) * n
-        elif self.out == 'ycbcr':
+        elif self.out == 'ycbcr' or rgb:                         # an RGB image: its components as they are
             out[0::3], out[1::3], out[2::3] = planes[0], planes[1], planes[2]
         else:
             conv = make_ycc_to_rgb(self.cc)
