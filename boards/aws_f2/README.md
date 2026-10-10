@@ -25,9 +25,14 @@ both widths with 30 % gaps: identical to libjpeg 9e, the decoder never waited fo
 passed. The 24 photo files (the 12 photos and their 4:2:0 copies) as one batch on 4 lanes of 512 bits, all
 identical to libjpeg 9e: 29.79 M engine clocks from the first start to the last done in file order, 29.04 M
 largest file first, against a lower bound of 28.68 M (the lanes' work divided by 4): 1.039 and 1.013 times
-the bound, lanes busy 96 and 99 %. Assumptions: a memory with no bandwidth limit (40-80 clocks of read
-latency, gaps only in the corpus batches), 100 clocks per register access. At F2's 250 MHz (not
-measured) the 29.04 M clocks would be 116 ms; the records are 4 bytes per pixel (2.7 GB/s per lane here).
+the bound, lanes busy 96 and 99 %, with a memory of unlimited bandwidth (40-80 clocks of read latency,
+no gaps in this batch) and 100 clocks per register access (0.4 us at 250 MHz; a real OCL round trip
+takes 1-2 us, which adds about 0.1-0.2 % per 12 MP photo and dominates for corpus-sized files, as the
+corpus batches' 45-58 % show). "Largest first" is largest file first, a stand-in for the decode time.
+At F2's 250 MHz (not measured) the 29.04 M clocks would be 116 ms; the records are 4 bytes per pixel,
+about 2.7 GB/s per lane at that clock.
+Not covered yet: the engine testbench never writes a busy lane's next job and starts it at done (the
+lane testbench checks that job inputs changed while busy are ignored, so this should work).
 Found by these tests and fixed: a job's late read data could reach the next job when the frame ended
 before the file did; a mid-frame abort left a pixel beat in the decoder that the next job counted in the
 clock before the decoder's reset acted (the lane now ignores the decoder in that clock; with the fix
