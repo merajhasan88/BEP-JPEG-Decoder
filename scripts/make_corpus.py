@@ -13,7 +13,8 @@ subsampled relative to chroma, mixed 1x2/2x1 chroma), sizes from 1x1 to 1160 px 
 sizes that are not multiples of the MCU, restart intervals (per MCU and per MCU row), optimised
 and standard Huffman tables, an EXIF-style APP1 that embeds a complete JPEG plus a COM segment
 containing FF D9, strips at the row-buffer limits of the raster builds, dense high-quality
-images (Huffman codes longer than 8 bits), and two unsupported files (progressive, SOF1)."""
+images (Huffman codes longer than 8 bits), an RGB-coded file (Adobe transform 0), and two unsupported
+files (progressive, SOF1)."""
 import os, sys, subprocess, tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -37,6 +38,8 @@ SPECS = [
     ("adp_13x11_q40_gray",      ADAPTER, 13, 11, "fill", True,  "-quality 40"),
     ("adp_16x16_q25_420",       ADAPTER,   16, 16, "fill", False, "-quality 25 -sample 2x2 -optimize"),
     ("adp_16x16_q25_gray",      ADAPTER,   16, 16, "fill", True,  "-quality 25 -optimize"),
+    # RGB colour space (component IDs 'R','G','B', Adobe APP14 transform 0): no colour conversion
+    ("adp_32x24_q50_rgb",       ADAPTER,   32, 24, "fill", False, "-quality 50 -rgb"),
     ("adp_17x33_q40_420",       ADAPTER, 17, 33, "fill", False, "-quality 40 -sample 2x2"),
     ("adp_32x32_q25_420",       ADAPTER,   32, 32, "fill", False, "-quality 25 -sample 2x2 -optimize"),
     ("adp_32x32_q25_444",       ADAPTER,   32, 32, "fill", False, "-quality 25 -sample 1x1 -optimize"),
@@ -112,8 +115,15 @@ def main():
         text = b"comment with ffd9 inside: \xff\xd9 !"
         com = b"\xff\xfe" + (len(text) + 2).to_bytes(2, "big") + text
         open(os.path.join(OUT_DIR, "adp_45x37_q30_422_exifthumb.jpg"), "wb").write(big[:2] + app1 + com + big[2:])
+        # a 5,000-byte COM after the scan, before the EOI (with FF D9 inside): the frame ends at the EOI
+        small = open(os.path.join(OUT_DIR, "adp_16x16_q25_420.jpg"), "rb").read()
+        tail = (b"a comment after the scan, with FF D9 inside: \xFF\xD9. " * 100)[:4998]
+        open(os.path.join(OUT_DIR, "adp_16x16_q25_420_comtail.jpg"), "wb").write(
+            small[:-2] + b"\xFF\xFE" + bytes([(len(tail) + 2) >> 8, (len(tail) + 2) & 255]) + tail + small[-2:])
         rows.append(("adp_45x37_q30_422_exifthumb", ADAPTER, 45, 37, "fill", False,
                      "adp_45x37_q30_422 with an APP1 embedding adp_8x8_q10_gray and a COM containing FF D9"))
+        rows.append(("adp_16x16_q25_420_comtail", ADAPTER, 16, 16, "fill", False,
+                     "adp_16x16_q25_420 with a 5,000-byte COM (containing FF D9) between its scan and its EOI"))
     for rom in ("adp_64x64_q25_420", "board_352x32_q6_420"):
         n = os.path.getsize(os.path.join(OUT_DIR, rom + ".jpg"))
         if n > ROM_MAX: sys.exit(f"{rom}: {n} bytes, does not fit the {ROM_MAX}-byte board ROM")
@@ -123,7 +133,7 @@ def main():
                 "with ImageMagick and libjpeg-turbo `cjpeg`. Metadata is stripped.\n\n"
                 "| file | source photo | size | scaling | settings |\n|---|---|---|---|---|\n")
         for name, src, w, h, mode, grey, opts in rows:
-            desc = ("grey, " if grey else "") + ("" if "exifthumb" in name else ("-baseline " if "sof1" not in name else "")) + opts
+            desc = ("grey, " if grey else "") + ("" if ("exifthumb" in name or "comtail" in name) else ("-baseline " if "sof1" not in name else "")) + opts
             f.write(f"| {name}.jpg | {src} | {w}x{h} | {'centre crop' if mode == 'fill' else 'centre band'} | {desc} |\n")
     print(f"{len(rows)} files in {OUT_DIR}")
 

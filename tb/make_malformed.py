@@ -7,14 +7,18 @@ targeted edit, and has an expectation for tb_jpeg (see run_malformed_tests.py):
 Covers the review items: missing / invalid / incomplete DQT, illegal Huffman tables (over-subscribed,
 all-ones code, DC symbol > 11, too short), zero width or height, bad SOF/SOS lengths, repeated
 component ids, undefined tables in a scan, RSTn out of order or without DRI, and files cut short
-(in_last before EOI) in the headers, in the scan and just before the EOI.
+(in_last before EOI) in the headers, in the scan and just before the EOI.  From the review of
+2026-10-10: a file that ends inside a comment after its scan (no EOI), DRI lengths other than 4,
+impossible segment lengths (0 and 1; SOF / SOS also 2), component ids repeated in both SOF and SOS,
+AC symbols outside the baseline domain, and libjpeg 9's colour transforms (LSE marker, big-gamut
+ids), which the decoder does not support.
 usage: make_malformed.py  (writes tb/malformed/*.jpg and tb/malformed/cases.json)"""
 import os, json, struct
 HERE = os.path.dirname(os.path.abspath(__file__))
 CORPUS = os.path.join(HERE, "corpus")
 OUT = os.path.join(HERE, "malformed")
 # error bits (rtl/jpeg_pkg.sv)
-DQT, DHT, SCAN, MARKER, FRAME, TRUNC = 1 << 2, 1 << 3, 1 << 6, 1 << 8, 1 << 11, 1 << 12
+SOF_TYPE, DQT, DHT, SCAN, MARKER, SYNC, FRAME, TRUNC = 1 << 0, 1 << 2, 1 << 3, 1 << 6, 1 << 8, 1 << 9, 1 << 11, 1 << 12
 
 def split(data):
     """-> (list of [marker, payload] before SOS, SOS payload, entropy data incl. EOI)"""
@@ -111,6 +115,33 @@ def main():
     add("trunc_in_scan", col[:len(col) - len(ent) // 2], TRUNC, True)
     add("trunc_before_eoi", col[:-2], TRUNC, True)
     add("trunc_in_scan_rst", rst[:len(rst) - 200], TRUNC, True)
+    # ---- review 2026-10-10
+    eoi_at = len(col) - 2                                   # col ends with its EOI
+    com = seg(0xFE, (b"a comment after the scan, with FF D9 inside: \xFF\xD9. " * 100)[:4998])   # 5,000 bytes
+    add("com_after_scan_no_eoi", col[:eoi_at] + com, TRUNC, True)
+    k_sos = col.index(b"\xFF\xDA")
+    for L in (0, 1, 2, 3, 5):                               # B.2.4.4: Lr = 4
+        add(f"dri_len{L}", col[:k_sos] + b"\xFF\xDD" + struct.pack(">H", L) + bytes(max(L - 2, 0)) + col[k_sos:], SYNC, True)
+    for m, bit, lens in ((0xDB, DQT, (0, 1)), (0xC4, DHT, (0, 1)), (0xC0, FRAME, (0, 1, 2)), (0xDA, SCAN, (0, 1, 2))):
+        for L in lens:                                      # an extra segment of impossible length before the headers
+            add(f"seg_{m:02x}_len{L}", col[:2] + bytes([0xFF, m]) + struct.pack(">H", L) + col[2:], bit, False)
+    def dup_both(g, s): p = sof(g); p[6 + 3] = p[6]; s[3] = s[1]       # C2 = C1 and Cs2 = Cs1 (B.2.2)
+    add("dup_ci_sof_and_sos", edit(dup_both), FRAME, False)
+    for v in (0x10, 0x20, 0xE0, 0x0B, 0x0F):                # F.1.2.2.1: AC sizes 1..10, or 0x00 / 0xF0
+        def badac(g, s, v=v):
+            for m, p in g:
+                if m != 0xC4: continue
+                q = 0
+                while q < len(p):
+                    n = sum(p[q + 1:q + 17])
+                    if p[q] >> 4 == 1: p[q + 16 + n] = v; return   # the AC table's last symbol
+                    q += 17 + n
+        add(f"ac_symbol_{v:02x}", edit(badac), DHT, False)
+    lse = bytes([0xFF, 0xF8]) + struct.pack(">H", 24) + bytes([0x0D, 0x00, 0xFF, 3, 2, 1, 3, 0x80, 0, 0, 0, 0,
+                                                              0, 0, 1, 0, 0, 0, 0, 1, 0, 0])   # libjpeg 9's subtract-green
+    add("lse_colour_transform", col[:k_sos] + lse + col[k_sos:], SOF_TYPE, False)
+    def bg_ids(g, s): p = sof(g); p[6], p[9], p[12] = 1, 0x22, 0x23; s[1], s[3], s[5] = 1, 0x22, 0x23
+    add("bg_ycc_ids", edit(bg_ids), SOF_TYPE, False)
     json.dump(cases, open(os.path.join(OUT, "cases.json"), "w"), indent=1)
     print(f"{len(cases)} cases in {OUT}")
 

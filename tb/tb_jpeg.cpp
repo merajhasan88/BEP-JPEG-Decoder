@@ -142,6 +142,13 @@ int main(int argc, char** argv) {
 #endif
     int rc = 0;
     if (!done) { fprintf(stderr, "FAIL: frame_done never seen\n"); rc = 1; }
+    // frame_done may come only once the image has ended: after its EOI (the file's last FF D9), or after
+    // its last byte when it has none (in_last: the frame ends with ERR_TRUNC)
+    if (done && !no_last) {
+        size_t need = data.size();
+        for (size_t i = data.size(); i >= 2; i--) if (data[i - 2] == 0xFF && data[i - 1] == 0xD9) { need = i; break; }
+        if (pos < need) { fprintf(stderr, "FAIL: frame_done after %zu bytes, before the image's end at %zu\n", pos, need); rc = 1; }
+    }
     if (expect_mask >= 0) {
         if (done && ((long)err & expect_mask) == expect_mask && !(no_pixels && npx)) fprintf(stderr, "PASS: frame ended with err=0x%04x (expected bits 0x%04lx)\n", err, expect_mask);
         else { fprintf(stderr, "FAIL: expected frame_done with err bits 0x%04lx, got err=0x%04x done=%d pixels=%lld\n", expect_mask, err, (int)done, npx); rc = 1; }

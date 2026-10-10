@@ -63,8 +63,10 @@ for cfg in $CONFIGS; do
     case $names in ""|\#*) continue;; esac
     files=""; golds=""; n=0
     for nm in $names; do
-      files="$files,$HERE/corpus/$nm.jpg"; n=$((n + 1))
-      case $nm in *UNSUPPORTED*) golds="$golds,-";; *) golds="$golds,$HERE/golden/$nm.$prof.$fmt.pnm";; esac
+      n=$((n + 1))
+      case $nm in malformed/*) files="$files,$HERE/$nm.jpg";; *) files="$files,$HERE/corpus/$nm.jpg";; esac
+      g="$HERE/golden/$nm.$prof.$fmt.pnm"
+      case $nm in *UNSUPPORTED*|malformed/*) golds="$golds,-";; *) [ -f "$g" ] && golds="$golds,$g" || golds="$golds,-";; esac
     done
     for st in $STALLS; do
       log=$(run "$cfg" +FILES="${files#,}" +GOLDENS="${golds#,}" +FMT="$fmt" +STALL="$st")
@@ -72,8 +74,10 @@ for cfg in $CONFIGS; do
       for nm in $names; do
         k=$((k + 1)); fl=$(echo "$log" | grep "^frame $k:")
         case $nm in
+          malformed/*) echo "$fl" | grep -q "err=0x0000" && ok=0; [ -n "$fl" ] || ok=0;;   # its own error, pixels allowed
           *UNSUPPORTED*) echo "$fl" | grep -q " 0 pixels, err=0x0000" && ok=0; echo "$fl" | grep -q " 0 pixels" || ok=0;;
-          *) echo "$fl" | grep -q "err=0x0000, MATCH" || ok=0;;
+          *) if [ -f "$HERE/golden/$nm.$prof.$fmt.pnm" ]; then echo "$fl" | grep -q "err=0x0000, MATCH" || ok=0
+             else echo "$fl" | grep -q " 0 pixels, err=0x0000" && ok=0; echo "$fl" | grep -q " 0 pixels" || ok=0; fi;;   # a refused format
         esac
       done
       echo "$log" | grep -q "^frames: $n$" || ok=0

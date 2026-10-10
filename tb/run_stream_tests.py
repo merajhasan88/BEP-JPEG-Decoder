@@ -18,15 +18,33 @@ SCENARIOS = [
     ("grey, 4:4:4, 4:2:0 with restarts, 4:2:2 with EXIF, back to back",
      ["adp_13x11_q40_gray", "adp_32x32_q25_444", "adp_40x50_q30_420_rst3", "adp_45x37_q30_422_exifthumb"]),
     ("the same image twice", ["adp_64x64_q25_420", "adp_64x64_q25_420"]),
+    # review 2026-10-10: each frame ends at its own EOI with its own error; the next image is unaffected
+    ("a comment after the scan: the frame ends at its EOI", ["adp_16x16_q25_420_comtail", "adp_32x32_q25_420"]),
+    ("a file ending inside a comment after its scan (no EOI), then a valid image", ["malformed/com_after_scan_no_eoi", "adp_32x32_q25_420"]),
+    ("a DRI of length 0, then a valid image", ["malformed/dri_len0", "adp_17x33_q40_420"]),
+    ("an SOF of length 1, then a valid image", ["malformed/seg_c0_len1", "adp_32x32_q25_420"]),
+    ("component ids repeated in SOF and SOS, then a valid image", ["malformed/dup_ci_sof_and_sos", "adp_32x32_q25_420"]),
+    ("an illegal AC symbol, then a valid image", ["malformed/ac_symbol_10", "adp_32x32_q25_420"]),
+    ("a libjpeg 9 colour transform (LSE), then a valid image", ["malformed/lse_colour_transform", "adp_32x32_q25_420"]),
+    ("an RGB-coded image between two YCbCr images", ["adp_32x32_q25_420", "adp_32x24_q50_rgb", "adp_17x33_q40_420"]),
 ]
 
+def path_of(name):
+    """the file of a scenario entry: tb/corpus/<name>.jpg, or tb/malformed/<name>.jpg for malformed/<name>"""
+    return os.path.join(HERE, name + ".jpg") if name.startswith("malformed/") else os.path.join(CORPUS, name + ".jpg")
+
 def golden(name, prof, fmt):
+    """the model's output, or None: an unsupported or malformed file, or a format the model refuses for it
+    (YCbCr / Y output of an RGB image) - the decoder must then end the frame with an error"""
+    if "UNSUPPORTED" in name or name.startswith("malformed/"): return None
     g = os.path.join(HERE, "golden", f"{name}.{prof}.{fmt}.pnm")
-    src = os.path.join(CORPUS, name + ".jpg")
+    src = path_of(name)
     if not os.path.exists(g) or os.path.getmtime(g) < os.path.getmtime(src):
         os.makedirs(os.path.dirname(g), exist_ok=True)
         data = open(src, "rb").read()
-        open(g, "wb").write(G.Decoder(data, upsample=prof, cc="turbo" if prof == "fancy" else "libjpeg9", out=fmt).run())
+        try: out = G.Decoder(data, upsample=prof, cc="turbo" if prof == "fancy" else "libjpeg9", out=fmt).run()
+        except ValueError: return None
+        open(g, "wb").write(out)
     return g
 
 def main():
@@ -41,13 +59,15 @@ def main():
         for title, names in SCENARIOS:
             for stall in (0, 30):
                 args = [binp, "--fmt", fmt, "--stall", str(stall)]
-                for n in names:
-                    args += [os.path.join(CORPUS, n + ".jpg"), "-" if "UNSUPPORTED" in n else golden(n, prof, fmt)]
+                golds = [golden(n, prof, fmt) for n in names]
+                for n, g in zip(names, golds):
+                    args += [path_of(n), g or "-"]
                 r = subprocess.run(args, capture_output=True, text=True, timeout=600)
                 frames = re.findall(r"frame (\d+): (\d+)x(\d+), (\d+) pixels, err=0x([0-9a-f]+), (.*)", r.stdout)
                 ok = len(frames) == len(names)
-                for (k, w, h, npx, err, verdict), n in zip(frames, names):
-                    if "UNSUPPORTED" in n: ok &= int(err, 16) != 0 and int(npx) == 0
+                for (k, w, h, npx, err, verdict), n, g in zip(frames, names, golds):
+                    if n.startswith("malformed/"): ok &= int(err, 16) != 0          # its own error; pixels allowed
+                    elif g is None: ok &= int(err, 16) != 0 and int(npx) == 0      # unsupported: no pixels
                     else: ok &= int(err, 16) == 0 and verdict.strip() == "MATCH"
                 total += 1
                 if not ok:

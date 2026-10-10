@@ -102,5 +102,101 @@
  "trunc_in_scan_rst": {
   "err": 4096,
   "pixels": true
+ },
+ "com_after_scan_no_eoi": {
+  "err": 4096,
+  "pixels": true
+ },
+ "dri_len0": {
+  "err": 512,
+  "pixels": true
+ },
+ "dri_len1": {
+  "err": 512,
+  "pixels": true
+ },
+ "dri_len2": {
+  "err": 512,
+  "pixels": true
+ },
+ "dri_len3": {
+  "err": 512,
+  "pixels": true
+ },
+ "dri_len5": {
+  "err": 512,
+  "pixels": true
+ },
+ "seg_db_len0": {
+  "err": 4,
+  "pixels": false
+ },
+ "seg_db_len1": {
+  "err": 4,
+  "pixels": false
+ },
+ "seg_c4_len0": {
+  "err": 8,
+  "pixels": false
+ },
+ "seg_c4_len1": {
+  "err": 8,
+  "pixels": false
+ },
+ "seg_c0_len0": {
+  "err": 2048,
+  "pixels": false
+ },
+ "seg_c0_len1": {
+  "err": 2048,
+  "pixels": false
+ },
+ "seg_c0_len2": {
+  "err": 2048,
+  "pixels": false
+ },
+ "seg_da_len0": {
+  "err": 64,
+  "pixels": false
+ },
+ "seg_da_len1": {
+  "err": 64,
+  "pixels": false
+ },
+ "seg_da_len2": {
+  "err": 64,
+  "pixels": false
+ },
+ "dup_ci_sof_and_sos": {
+  "err": 2048,
+  "pixels": false
+ },
+ "ac_symbol_10": {
+  "err": 8,
+  "pixels": false
+ },
+ "ac_symbol_20": {
+  "err": 8,
+  "pixels": false
+ },
+ "ac_symbol_e0": {
+  "err": 8,
+  "pixels": false
+ },
+ "ac_symbol_0b": {
+  "err": 8,
+  "pixels": false
+ },
+ "ac_symbol_0f": {
+  "err": 8,
+  "pixels": false
+ },
+ "lse_colour_transform": {
+  "err": 1,
+  "pixels": false
+ },
+ "bg_ycc_ids": {
+  "err": 1,
+  "pixels": false
  }
 }

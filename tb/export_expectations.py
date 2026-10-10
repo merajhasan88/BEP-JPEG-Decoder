@@ -10,6 +10,12 @@ import os, json, glob
 HERE = os.path.dirname(os.path.abspath(__file__))
 import run_tests as T
 import run_stream_tests as S
+G = T.G
+
+def refused(data, prof, fmt):
+    """the model refuses this output format for the image (YCbCr / Y output of an RGB image)"""
+    try: G.Decoder(data, upsample=prof, cc="turbo" if prof == "fancy" else "libjpeg9", out=fmt).run(); return False
+    except ValueError: return True
 
 def main():
     lines = []
@@ -25,8 +31,12 @@ def main():
                     lines.append(f"{b} {cfg} {fmt} error -"); continue
                 if rb is not None and (not T.rowbuf_fits_fast(data, fancy, fmt, rb) if fast else T.rowbuf_need(data, fancy, fmt) > rb):
                     lines.append(f"{b} {cfg} {fmt} width -"); continue
-                gfmt = fmt if (has_rgb or fmt != "rgb") else "ycbcr"     # RGB_OUT=0: FMT_RGB gives YCbCr
-                g = f"golden/{b}.{'fancy' if fancy else 'box'}.{gfmt}.pnm"
+                prof = "fancy" if fancy else "box"
+                if not os.path.exists(os.path.join(HERE, f"golden/{b}.{prof}.{fmt}.pnm")) and refused(data, prof, fmt):
+                    lines.append(f"{b} {cfg} {fmt} error -"); continue
+                rgb_img = not os.path.exists(os.path.join(HERE, f"golden/{b}.{prof}.ycbcr.pnm")) and refused(data, prof, "ycbcr")
+                gfmt = fmt if (has_rgb or fmt != "rgb" or rgb_img) else "ycbcr"     # RGB_OUT=0: FMT_RGB gives YCbCr
+                g = f"golden/{b}.{prof}.{gfmt}.pnm"
                 if not os.path.exists(os.path.join(HERE, g)): raise SystemExit(f"missing {g}: run run_tests.py first")
                 lines.append(f"{b} {cfg} {fmt} pass {g}")
     with open(os.path.join(HERE, "expected.txt"), "w") as f:
