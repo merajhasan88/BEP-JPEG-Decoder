@@ -1,0 +1,23 @@
+# EP2C5 board run 2026-10-10 (boards/ep2c5/fpga_jtag re-fitted after the review fixes, RTL c68ac30: 4,481 LEs, 95 MHz met +0.448 ns): boards/ep2c5/scripts/jtag_decode.py
+## new test files (tb/corpus: RGB-coded, comment after the scan; tb/malformed: review cases)
+adp_32x24_q50_rgb.jpg: 32x24, 791 bytes | decoder 3425 clocks = 4.460 clocks/pixel = 0.036 ms at 95 MHz | streaming 0.0 s (25.5 KB/s) | checksum 0xB7E3EC0B = reference, err 0x0000, overflow 0 -> PASS
+adp_16x16_q25_420_comtail.jpg: 16x16, 5239 bytes | decoder 6426 clocks = 25.102 clocks/pixel = 0.068 ms at 95 MHz | streaming 0.3 s (19.0 KB/s) | checksum 0xE42DA008 = reference, err 0x0000, overflow 0 -> PASS
+com_after_scan_no_eoi.jpg: 5237 bytes | frames 1, decoder 6424 clocks, err 0x1000 (expected bits 0x1000), checksum 0xE42DA008, = libjpeg -> PASS
+dri_len0.jpg: 339 bytes | frames 1, decoder 1945 clocks, err 0x0200 (expected bits 0x0200), checksum 0xE42DA008 -> PASS
+dup_ci_sof_and_sos.jpg: 335 bytes | frames 1, decoder 1364 clocks, err 0x0800 (expected bits 0x0800, no pixels), checksum 0x00000000, != libjpeg -> PASS
+ac_symbol_10.jpg: 335 bytes | frames 1, decoder 1364 clocks, err 0x0008 (expected bits 0x0008, no pixels), checksum 0x00000000, != libjpeg -> PASS
+lse_colour_transform.jpg: 361 bytes | frames 1, decoder 1391 clocks, err 0x0001 (expected bits 0x0001, no pixels), checksum 0x00000000 -> PASS
+seg_c0_len1.jpg: 339 bytes | frames 1, decoder 1369 clocks, err 0x0800 (expected bits 0x0800, no pixels), checksum 0x00000000 -> PASS
+## the owner's 12 photos (test_images/): clocks and checksums identical to board_jtag_95mhz_2026-10-04.txt
+adapter.jpg: 3120x4160, 3533250 bytes | decoder 19234181 clocks = 1.482 clocks/pixel = 202.465 ms at 95 MHz | streaming 100.3 s (35.2 KB/s) | checksum 0x54C7A8DF = reference, err 0x0000, overflow 0 -> PASS
+IMG20260405182829.jpg: 3120x4160, 3733794 bytes | decoder 20908689 clocks = 1.611 clocks/pixel = 220.091 ms at 95 MHz | streaming 104.8 s (35.6 KB/s) | checksum 0xA14BECCF = reference, err 0x0000, overflow 0 -> PASS
+IMG20260405182833.jpg: 3120x4160, 3876791 bytes | decoder 21531453 clocks = 1.659 clocks/pixel = 226.647 ms at 95 MHz | streaming 109.8 s (35.3 KB/s) | checksum 0xDCBC6578 = reference, err 0x0000, overflow 0 -> PASS
+IMG20260425135544.jpg: 3120x4160, 3307309 bytes | decoder 19143517 clocks = 1.475 clocks/pixel = 201.511 ms at 95 MHz | streaming 93.9 s (35.2 KB/s) | checksum 0x508148C7 = reference, err 0x0000, overflow 0 -> PASS
+IMG20260425135628.jpg: 4160x3120, 4733886 bytes | decoder 23107669 clocks = 1.780 clocks/pixel = 243.239 ms at 95 MHz | streaming 131.4 s (36.0 KB/s) | checksum 0xE04E07E8 = reference, err 0x0000, overflow 0 -> PASS
+IMG20260425141210.jpg: 4160x3120, 3463167 bytes | decoder 19061153 clocks = 1.469 clocks/pixel = 200.644 ms at 95 MHz | streaming 95.0 s (36.5 KB/s) | checksum 0xDA194215 = reference, err 0x0000, overflow 0 -> PASS
+IMG20260523191343.jpg: 3120x4160, 3717923 bytes | decoder 20037777 clocks = 1.544 clocks/pixel = 210.924 ms at 95 MHz | streaming 95.1 s (39.1 KB/s) | checksum 0xDE4879CB = reference, err 0x0000, overflow 0 -> PASS
+IMG20260612210949.jpg: 4160x3120, 2689496 bytes | decoder 17004745 clocks = 1.310 clocks/pixel = 178.997 ms at 95 MHz | streaming 73.4 s (36.6 KB/s) | checksum 0xE4B7BAD1 = reference, err 0x0000, overflow 0 -> PASS
+IMG20260716020409.jpg: 4160x3120, 1663427 bytes | decoder 15364517 clocks = 1.184 clocks/pixel = 161.732 ms at 95 MHz | streaming 46.5 s (35.7 KB/s) | checksum 0x877671CD = reference, err 0x0000, overflow 0 -> PASS
+IMG20260716020422.jpg: 4160x3120, 1710756 bytes | decoder 15411569 clocks = 1.187 clocks/pixel = 162.227 ms at 95 MHz | streaming 49.0 s (34.9 KB/s) | checksum 0x55C6F692 = reference, err 0x0000, overflow 0 -> PASS
+IMG20260716020424.jpg: 4160x3120, 1674973 bytes | decoder 15364489 clocks = 1.184 clocks/pixel = 161.731 ms at 95 MHz | streaming 47.7 s (35.1 KB/s) | checksum 0x94548961 = reference, err 0x0000, overflow 0 -> PASS
+IMG20260723160735.jpg: 4160x3120, 2617767 bytes | decoder 17368025 clocks = 1.338 clocks/pixel = 182.821 ms at 95 MHz | streaming 75.0 s (34.9 KB/s) | checksum 0xAD6969AF = reference, err 0x0000, overflow 0 -> PASS

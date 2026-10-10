@@ -9,12 +9,28 @@ request; the names are the owner's.
 | **Proposal B** | a way around the Huffman loop limit (one code per clock) | research started with A, in parallel |
 | **Task A** | batched mode of the wide core on fpgas.online Welland | **done 2026-10-05**: 15 wide decoders at 150 MHz (-3 grade), 18/18 identical to libjpeg 9e on the board, 372 photos/s on adapter.jpg; details below and in `boards/acorn_cle215/README.md` |
 | **Task B** | all tests on AWS F2 | last; nothing is set up on AWS without the owner's go-ahead |
+| **Review 2026-10-10** | external review of the 10 October hand-over (`../jpeg-decoder-review-2026-10-10.md`) | four defects: three fixed and verified the same day, the fourth (board checksum) described; see "Review of 2026-10-10" below |
 
 Research, measurements, estimates and the plan for both proposals: `PROPOSALS.md`.
 
 Method for both proposals (the order the owner chose for the wide core, "model first"): published
 methods and existing decoders, then estimates with `model/perf`, then a plan with numbers for the
 owner, and RTL only after that. The output must stay bit-exact (libjpeg 9e and Pillow profiles).
+
+## Review of 2026-10-10
+
+The review's sequence, and what was done on 2026-10-10 (development branch; `proposals-AB` only had its
+document corrected):
+
+| priority | work | state |
+|---|---|---|
+| 1 | completion, validation, unsupported colour | **done**: frames end at the image's EOI (ERR_TRUNC without one, ERR_SCAN for a second scan); segment lengths, the 4-byte DRI, distinct component ids, the AC symbol domain; RGB-coded files by libjpeg 9e's rule passed through (RGB output only), libjpeg 9's other colour spaces ERR_SOF_TYPE. Regression 1,926 + 234 + 900 runs (37 corpus files, 50 malformed); the review's own probes as expected in all four of its configurations. EP2C5 re-fit: see README / CLAUDE.md |
+| - | board checksum (a sum of position and colour terms: colours exchanged between positions go unseen) | described where board results are cited; new harnesses use a position-binding hash and read whole images back |
+| 2 | freeze profiles, reproducible builds | results now name their source commits (acorn README); a full source/input hash manifest is still to do |
+| 3 | one FAST=2 decoder with real memory input and RGB output, full readback, wall time | the F2 harness is designed for this (Task B): see there |
+| 4 | equivalent CPU comparison | "desktop" figures are now labelled a hypothetical 2.04x core (a tjbench ratio, not a measurement); the FFmpeg clock pairing is fixed in `bench/run_bench.py`; a re-run and a measured current CPU need the owner's go-ahead (power profile) |
+| 5 | Proposal A integrated, four-way then eight-way | not started; the pass-1 reader's malformed-input contract is noted in PROPOSALS.md (proposals-AB) |
+| 6 | scale lanes or clocks on measured bottlenecks | after 3 and 5 |
 
 ## Proposal A: split a stream without restart markers
 
@@ -39,9 +55,9 @@ Owner: "In parallel (pun intended) lets find a way around Huffman loop limitatio
   lookup, code length, shift, next lookup) cannot be split into more pipeline stages. The wide core
   (`FAST=2`) decodes one code per clock and closes timing at 150 MHz on the Artix-7 XC7A200T-3;
   estimate 250-350 MHz on the fastest FPGAs.
-- **Target.** The fastest desktop CPU core decodes about 2.04x as fast as the laptop's i7-8550U
-  (libjpeg-turbo tjbench on OpenBenchmarking: Core Ultra 9 285K 359 vs 176 Mpixel/s), so the wide
-  core would need about 270 MHz to beat it on every photo (estimate; at 150 MHz it takes 1.31-1.80x
+- **Target.** A hypothetical desktop core 2.04x as fast as the laptop's i7-8550U (the ratio of
+  libjpeg-turbo's tjbench on OpenBenchmarking, Core Ultra 9 285K 359 vs 176 Mpixel/s - a different
+  benchmark, not measured on our files), so the wide core would need about 270 MHz to beat it on every photo (estimate; at 150 MHz it takes 1.31-1.80x
   that core's time, against 0.64-0.88x of the laptop core's, measured).
 - **Ideas to study:** decoding two or more codes per lookup; decoding speculatively at several bit
   positions and keeping the right result; together with Proposal A, letting independent pieces of a
@@ -123,3 +139,26 @@ Owner: "In parallel (pun intended) lets find a way around Huffman loop limitatio
 - **"All tests" (owner, 2026-10-04):** all 24 photo files on the single core (`FAST=1`), the wide
   core (`FAST=2`) and the batched mode, plus whatever comes out of Proposals A and B; checked against
   libjpeg 9e's checksums and the simulated clock counts, as on Welland.
+- **Harness design (2026-10-10, proposed for the owner's decision; nothing built or run on AWS).**
+  The review asks for real memory input, RGB output read back in full, wall time, and notes that the
+  KU5P previews show timing portability, not an F2 result. What AWS's F2 kit offers (aws-fpga, branch
+  f2): the shell's PCIS (512-bit AXI4, host-initiated, reaches the 64 GB DDR4 DIMM and the 16 GB HBM),
+  PCIM (512-bit AXI4, the custom logic reads and writes host memory), OCL (AXI-Lite registers),
+  250 MHz `clk_main_a0`; HBM: 32 AXI3 channels at 450 MHz, 460 GB/s theoretical, about 430 GB/s
+  measured by AWS's `cl_mem_perf` example; the kit supports Vivado 2025.2 (on premises only with a
+  Vivado ML Enterprise licence, which we do not have), and its shell simulation model runs on AWS's
+  build image, not on our free Vivado 2026.1.
+  - Option 1 (recommended): **HBM job engine.** The host writes JPEG files into HBM over PCIS; per lane
+    a job register (input address and length, output address) in OCL; each lane reads its file from
+    its own HBM channel and writes its RGB there (up to 3 GB/s per lane, far below a channel's
+    ~14 GB/s); the host reads the RGB back over PCIS and compares every pixel with libjpeg 9e, and
+    reads clocks, errors and a position-binding hash per job. 24 lanes need 24 of the 32 channels.
+  - Option 2: AWS's streaming data engine (CL_SDE, over PCIM) feeding the lanes from host memory
+    and writing RGB back to it: no device memory, but its host software is the Virtual Ethernet
+    application's, a larger software effort.
+  - Option 3: the Welland harness with PCIe instead of the UART (host writes into lane FIFOs, results
+    by register, pixels only hashed): cheapest, but compute rates only - what the review criticises.
+  - Order for option 1: (a) on the F2 instance, run AWS's pre-built `cl_mem_perf` image and measure the
+    host <-> HBM paths (no build: about 30 minutes of the f2.6xlarge); (b) write the harness here and
+    simulate it with Verilator against our own models of PCIS, OCL and HBM; (c) the DCP build on AWS's
+    build image, where the shell simulation can also run first; (d) the run, with full readback.

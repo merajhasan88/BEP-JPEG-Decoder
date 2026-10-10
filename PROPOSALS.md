@@ -11,10 +11,11 @@ No RTL has been written for either proposal.
 ## Summary
 
 Single-photo decode time at 150 MHz (the Artix-7 clock) divided by that of the fastest CPU decoder on
-one core, per photo. "Desktop" = the fastest desktop core, taken as 2.04x the laptop's i7-8550U
-(libjpeg-turbo's tjbench on OpenBenchmarking: Core Ultra 9 285K 359 vs 176 Mpixel/s).
+one core, per photo. "Desktop" = a hypothetical core 2.04x the laptop's i7-8550U (the ratio of
+libjpeg-turbo's tjbench on OpenBenchmarking: Core Ultra 9 285K 359 vs 176 Mpixel/s - a different
+benchmark, not measured on these files).
 
-| design | clocks / pixel | vs laptop core (3.9 GHz) | vs fastest desktop core | needs |
+| design | clocks / pixel | vs laptop core (3.9 GHz) | vs hypothetical 2.04x core | needs |
 |---|---|---|---|---|
 | today's wide core (measured) | 0.255-0.561 | 0.64-0.88 | 1.30-1.79 | - |
 | A, 2 segments | 0.19-0.54 | 0.59-0.77 | 1.20-1.57 | the whole file in memory, a resume mode, 2 cores |
@@ -134,7 +135,7 @@ Acorn with DDR3.
 ## Recommendation
 
 Proposal A first: step 1 (the C reference) is cheap, needs no board and decides whether the method is
-sound on these files; the estimates say 4 segments beat the fastest desktop core on every photo
+sound on these files; the estimates say 4 segments beat the hypothetical 2.04x desktop core on every photo
 (0.60-0.79x its time) and 8 segments take a third of its time - on any board that holds the file in
 memory, which points to AWS F2. For Proposal B, the C-slow loop (252 MHz for two streams, 1.52x
 today's loop) is the option worth carrying into A's design; the all-offsets loop is not.

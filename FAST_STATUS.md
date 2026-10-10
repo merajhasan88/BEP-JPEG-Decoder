@@ -439,6 +439,33 @@ those pixels differ from libjpeg's (they are to be discarded anyway; documented)
   jpegdecoder-systemverilog on 2026-10-04; main = the owner's 2022-23 work, tag `original-2023`); `main` (BEBCL-JPEG) sits on top of origin/main, so the push is a
   fast-forward. The remote-board client stays out of the repositories (owner's decision).
 
+## 7f. 2026-10-10: the review of 2026-10-10 on the EP2C5
+
+The fixes (README "Completion contract", CLAUDE.md "Since 2026-10-10"): frames end at the image's EOI,
+segment-length / DRI / component-id / AC-symbol checks, RGB-coded files by libjpeg 9e's rule. The first
+version (7c7e3f2) grew the parser from 633 to 746 LUTs and `fpga_jtag` needed 291 of 288 LABs; the
+parser was made smaller with the same behaviour (c68ac30: six 7-bit id compares instead of twelve 8-bit
+ones, the APP0/APP14 byte index in `k`, one Adobe flag, one marker dispatch). Re-fit with
+`compile_all.sh` (Quartus 13.0sp1):
+
+| build | LEs 2026-10-04 | LEs 2026-10-10 | timing |
+|---|---:|---:|---|
+| fpga_raster | 4,547 | **4,587** (21 free) | met at 50 MHz, Fmax 60.5 |
+| fpga_jtag | 4,425 | **4,481** | met at 95 MHz, +0.448 ns, Fmax 99.2 |
+| fpga_fast_bench | 4,368 | 4,420 | met at 95 MHz, +0.547 ns, Fmax 100.2 |
+| fpga_fast | 4,296 | 4,433 | met, Fmax 74.3 |
+| gls_fast | 4,337 | 4,410 | met, Fmax 75.2 |
+| gls_raster | 4,537 | 4,573 | met, Fmax 59.8 |
+| fpga_raster_ycc | 4,454 | 4,358 | met, Fmax 58.0 |
+| fpga_raster_box | 4,089 | 4,132 | met, Fmax 62.8 |
+| fpga / gls | 3,374 / 3,375 | 3,469 / 3,454 | met, Fmax 59.7 / 57.3 |
+
+On the board (`fpga_jtag`, USB-Blaster, `bench/board_jtag_95mhz_2026-10-10.txt`): the 12 photos with
+the same clock counts and checksums as on 2026-10-04 (the fixes cost nothing on ordinary files); the new
+RGB-coded file and the comment-tail file with libjpeg 9e's checksum; six of the new malformed cases with
+their expected error bits (a file ending inside a comment after its scan: ERR_TRUNC with libjpeg's
+pixels). The board-tested bitstreams of 2026-10-04 are kept in `boards/ep2c5/*/output_files_2026-10-04/`.
+
 ## 8. Open items (in order)
 
 1. (done) Board run of `quartus/fpga_jtag`: `quartus_pgm -m jtag -o "p;quartus/fpga_jtag/output_files/jpeg_fpga_jtag.sof"`,

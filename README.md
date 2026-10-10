@@ -6,7 +6,8 @@ no frame buffer. It decodes baseline JPEG (ITU-T T.81 sequential DCT, Huffman co
 samples), which is what cameras, phones and almost all software write.
 
 - **Bit-exact**: its pixels are identical to libjpeg 9e, or (one build option) to Pillow, OpenCV
-  and libjpeg-turbo, on every test file and photo.
+  and libjpeg-turbo, on every test file and photo - for the supported formats (baseline 8-bit, grey /
+  YCbCr / RGB, the libjpeg islow IDCT; see below); anything else is flagged in `err`.
 - **Backwards-compatible**: plain SystemVerilog in the subset that Quartus II 13.0sp1 accepts, with
   no vendor primitives (RAMs and multipliers are inferred). The same RTL runs on a 2004 Intel/Altera
   Cyclone II (EP2C5, 4,608 logic elements) and a current Xilinx Artix-7, and builds with Quartus,
@@ -31,7 +32,7 @@ MCU order).
 
 | measured on a board | core | clock | resources | 12-megapixel photo |
 |---|---|---:|---|---:|
-| Intel/Altera Cyclone II EP2C5T144C8 (2004, 4,608 LEs) | `FAST=1` | 95 MHz | 4,425 LEs (96 %), 26/26 multipliers | 202-284 ms |
+| Intel/Altera Cyclone II EP2C5T144C8 (2004, 4,608 LEs) | `FAST=1` | 95 MHz | 4,481 LEs (97 %), 26/26 multipliers | 202-284 ms |
 | Xilinx Artix-7 XC7A200T (Acorn CLE-215+, remote board at fpgas.online) | `FAST=1` | 150 MHz | 2,488 LUTs, 17 DSP48E1, 7.5 BRAM | 87-154 ms |
 | the same Artix-7 board | `FAST=2` | 150 MHz | 6,211 LUTs, 33 DSP48E1, 9 BRAM | **22-49 ms** |
 | the same board, 15 decoders at once | 15 x `FAST=2` | 150 MHz (-3 grade) | 91,949 LUTs, 495 DSP48E1, 135 BRAM | **15 photos in 40 ms** (adapter.jpg) |
@@ -89,12 +90,14 @@ photo 2.2-3.2x faster than the `FAST=1` core at 150 MHz, but the `FAST=2` core a
 on the board. This is single-image time on one CPU core; a multi-core CPU decoding several photos at
 once still has more throughput than one decoder. Fifteen wide decoders on the same board decoded at
 the same time with pixels identical to libjpeg 9e; from their clock counts (each lane's decode time
-with an ideal input; a real system must feed all 15 lanes at full speed) that is 372 photos/s on
-adapter.jpg (4.83 Gpixel/s), 20.7x one laptop core. On the 24 photo files the batch does 408
-photos/s, against 74.5 photos/s measured on the laptop's whole CPU (i7-8550U, 4 cores / 8 threads,
+with an ideal input: the gated clocks leave out the waits for the UART; a real system must feed all
+15 lanes at full speed, about 1.3 GB/s of JPEG in and 14.5 GB/s of RGB out for adapter-sized photos)
+that is 372 photos/s on adapter.jpg (4.83 Gpixel/s; the 15 lanes decoded copies of one file sent
+once), 20.7x one laptop core. On the 24 photo files the batch does 408 photos/s (a schedule of the
+24 single-file times on 15 lanes, longest first: 371.5 in file order, 470.8 with ideal balance), against 74.5 photos/s measured on the laptop's whole CPU (i7-8550U, 4 cores / 8 threads,
 libjpeg-turbo -nosmooth; it holds 2.35 GHz on all cores at its ~18 W limit): 5.5x the whole laptop
-CPU, and 3.3x even if every core held 3.9 GHz. Estimate only: about half of an ideal 16-core desktop
-CPU. That build meets
+CPU, and 3.3x even if every core held 3.9 GHz. Estimate only: about half of a 16-core CPU whose
+cores are each a hypothetical core 2.04x the laptop's (the libjpeg-turbo tjbench ratio of a Core Ultra 9 285K to the i7-8550U on OpenBenchmarking, 359 vs 176 Mpixel/s; not measured on these files). That build meets
 150 MHz for the board's -3 speed grade; on -2, the grade of the other rows, it reaches 141.5 MHz
 ([boards/acorn_cle215](boards/acorn_cle215/README.md)).
 
@@ -128,9 +131,9 @@ Options of `decode.sh` and `decode.py`:
 
   | `--core` | core | `FAST` | pixels per clock | `--profile` | size (measured builds) |
   |---|---|---|---|---|---|
-  | `single` (default) | pipelined (fast) core | 1 | at most 1; 1.0-2.4 clocks per pixel | `libjpeg`, `pillow` | 4,296-4,425 LEs on the Cyclone II EP2C5 |
+  | `single` (default) | pipelined (fast) core | 1 | at most 1; 1.0-2.4 clocks per pixel | `libjpeg`, `pillow` | 4,410-4,481 LEs on the Cyclone II EP2C5 |
   | `wide` | wide core | 2 | at most 4; 0.25-0.56 clocks per pixel on phone photos | `libjpeg` (MCU order only) | ~5,800 LUTs and 33 DSPs on an Artix-7; too big for the EP2C5 |
-  | `small` | compact core | 0 (the RTL default) | ~13.6 clocks per pixel | `libjpeg`, `pillow` | 3,374-4,547 LEs on the EP2C5 |
+  | `small` | compact core | 0 (the RTL default) | ~13.6 clocks per pixel | `libjpeg`, `pillow` | 3,469-4,587 LEs on the EP2C5 |
 
   The test scripts (`tb/run_tests.py --configs`, `tb/sim.sh -c`) name their builds after the core:
   `fmcu`, `frbox`, `frfancy` = single; `wmcu` = wide; `mcu`, `rbox`, `rfancy`, `ep2c5`, `noyrgb` = small.
@@ -196,6 +199,10 @@ raster order, so `px_sof`/`px_eol` map directly onto AXI4-Stream video `tuser`/`
 `frame_start` and one `frame_done`, also when it is unusable. Read `err` at `frame_done`: it
 holds that image's errors (it is cleared when the next image's SOI is accepted; the input is held
 at that SOI until the previous frame is done). If `err` is not zero, discard the frame's pixels.
+`frame_done` comes at the image's EOI: segments after the scan (a COM, for example) are consumed
+first, a file that ends without its EOI (`in_last`) ends with `ERR_TRUNC`, and a second scan after a
+decoded one is `ERR_SCAN` (since 2026-10-10; before, the frame could end with the last pixel, ahead
+of a trailing segment, without the error of a missing EOI).
 An image with a header or table error produces no pixels at all. The parser only uses a table
 that was read completely and legally, and only one that the image or an earlier one defined:
 DQT (Pq = 0, Tq <= 3, no zero Qk), DHT (Tc/Th <= 1, a code tree that is not over-subscribed and
@@ -241,9 +248,9 @@ that other tools ignore.
 
 | device, tool | build | logic | memory | multipliers | Fmax |
 |---|---|---:|---:|---:|---:|
-| Cyclone II EP2C5, Quartus 13.0sp1 | compact, MCU order (`boards/ep2c5/fpga`) | 3,374 LEs | 9 M4K | 26 9-bit | 61 MHz |
-| Cyclone II EP2C5, Quartus 13.0sp1 | compact, raster + Pillow smoothing + RGB (`fpga_raster`) | 4,547 LEs | 25 M4K | 26 9-bit | 60 MHz |
-| Cyclone II EP2C5, Quartus 13.0sp1 | fast, MCU order (`fpga_jtag`, board harness included) | 4,425 LEs | 59,712 bits | 26 9-bit | 98.7 MHz |
+| Cyclone II EP2C5, Quartus 13.0sp1 | compact, MCU order (`boards/ep2c5/fpga`) | 3,469 LEs | 9 M4K | 26 9-bit | 59.7 MHz |
+| Cyclone II EP2C5, Quartus 13.0sp1 | compact, raster + Pillow smoothing + RGB (`fpga_raster`) | 4,587 LEs | 25 M4K | 26 9-bit | 60.5 MHz |
+| Cyclone II EP2C5, Quartus 13.0sp1 | fast, MCU order (`fpga_jtag`, board harness included) | 4,481 LEs | 59,712 bits | 26 9-bit | 99.2 MHz |
 | Artix-7 XC7A200T-2, Vivado 2026.1 | fast, MCU order, decoder alone (from the build below) | 2,204 LUTs, 2,124 FFs | 13 BRAM18 | 17 DSP48E1 | - |
 | Artix-7 XC7A200T-2, Vivado 2026.1 | fast, MCU order (`boards/acorn_cle215`, UART harness included) | 2,488 LUTs, 2,671 FFs | 7.5 BRAM36 | 17 DSP48E1 | 157-160 MHz |
 
@@ -259,14 +266,18 @@ number of APPn/COM segments (EXIF thumbnails are skipped correctly), several tab
 segment, image sizes up to 65535x65535 (MCU order; raster order up to the row-buffer width).
 Not supported, flagged in `err`, and the scan is skipped to its EOI: progressive, lossless,
 arithmetic coding, 12-bit samples, 16-bit quantisation tables, non-interleaved multi-scan files,
-sampling factors 3/4, 4-component (CMYK) files. Adobe-RGB (no colour transform) files are decoded
-as YCbCr. Dequantised coefficients and the IDCT workspace are 16-bit (saturating); real images
+sampling factors 3/4, 4-component (CMYK) files, libjpeg 9's big-gamut colour spaces and its LSE
+colour transform (`ERR_SOF_TYPE`). RGB-coded files (libjpeg 9e's rule: component ids 'R','G','B', or
+an Adobe APP14 with transform 0 and neither JFIF nor the ids 1,2,3) are passed through without colour
+conversion, RGB output only (YCbCr or Y output of such a file is `ERR_SOF_TYPE`). Headers are
+checked as T.81 requires (since 2026-10-10 also: segment lengths, the 4-byte DRI, distinct component
+ids, the baseline AC symbol domain). Dequantised coefficients and the IDCT workspace are 16-bit (saturating); real images
 from 8-bit sources stay far inside that, so all test files match exactly.
 
 ## Verification
 
 ```sh
-tb/run_tests.sh                       # SystemVerilog testbench: 1,818 + 90 + 468 runs (-s xsim for Vivado's simulator)
+tb/run_tests.sh                       # SystemVerilog testbench: 1,926 + 234 + 900 runs (-s xsim for Vivado's simulator)
 cd tb && make && make test            # the same runs with the C++ harness, driven by Python
 python3 ../scripts/compare_refs.py corpus/*.jpg   # the model against Pillow / OpenCV / libjpeg-turbo
 ```
@@ -274,19 +285,22 @@ Both regressions compare against the reference images in `tb/golden/` (made by t
 `model/jpeg_golden.py`); `tb/run_tests.sh` takes its expectations from `tb/expected.txt`,
 `tb/stream_scenarios.txt` and `tb/malformed/cases.txt` (written by `tb/export_expectations.py`).
 
-- **Test files** (`tb/corpus/`, 35 files): generated by `scripts/make_corpus.py` from one photo,
+- **Test files** (`tb/corpus/`, 37 files): generated by `scripts/make_corpus.py` from one photo,
   `test_images/adapter.jpg` (settings of every file in `tb/corpus/SOURCES.md`): every chroma
   layout, sizes from 1x1 to 1160 px wide, restart intervals, an EXIF APP1 embedding a whole JPEG,
-  strips at the row-buffer limits, dense q90-q98 images with Huffman codes up to 16 bits, and two
+  strips at the row-buffer limits, dense q90-q98 images with Huffman codes up to 16 bits, an
+  RGB-coded file (Adobe transform 0), a 5,000-byte comment between the scan and the EOI, and two
   unsupported files.
 - **Reference model** (`model/jpeg_golden.py`): a bit-exact Python decoder in both profiles; on
   every corpus file it is identical to Pillow, OpenCV and libjpeg-turbo `djpeg` (default,
   `-nosmooth`, `-grayscale`) and to Pillow's YCbCr/luma draft modes (`scripts/compare_refs.py`).
 - **RTL regression** (`tb/run_tests.py`): 9 build configurations (5 compact, 3 `FAST=1`, 1 `FAST=2`)
-  x 3 output formats x 33 files x {no stalls, 30 % random input stalls + output back-pressure}, plus
-  the 2 unsupported files = **1,818 runs, all bit-exact, with no unexpected error bit**, with
-  strict raster order and `sof`/`eol` checked and `ERR_WIDTH` raised exactly where predicted.
-- **Images back to back without reset** (`tb/run_stream_tests.py`): 90 runs.
+  x 3 output formats x 35 files x {no stalls, 30 % random input stalls + output back-pressure}, plus
+  the 2 unsupported files = **1,926 runs, all bit-exact, with no unexpected error bit**, with
+  strict raster order and `sof`/`eol` checked and `ERR_WIDTH` raised exactly where predicted; every
+  run also fails if `frame_done` comes before the image's EOI (or, without one, its last byte).
+- **Images back to back without reset** (`tb/run_stream_tests.py`): 13 scenarios = 234 runs, among
+  them malformed files each followed by a valid image (its own error, the next frame exact).
 - **Two independent testbenches**: the C++ harness (`make test`) and the SystemVerilog testbench
   (`tb/run_tests.sh`) run the same 2,376 checks and both pass all of them on Verilator; on Vivado's
   xsim the SystemVerilog testbench passes a 396-run subset of the compact and fast cores (MCU and
@@ -296,16 +310,23 @@ Both regressions compare against the reference images in `tb/golden/` (made by t
   declaration, and unreset valid bits in the wide core's IDCT pipeline (all fixed); and an xsim bug
   (`tab[idx[k]]` inside a procedural loop read as `tab[k]`) that the wide core's output stage now
   avoids.
-- **Malformed and truncated files** (`tb/make_malformed.py`, `tb/run_malformed_tests.py`): 26
+- **Malformed and truncated files** (`tb/make_malformed.py`, `tb/run_malformed_tests.py`): 50
   files, each one edit away from a corpus file (bad, missing or incomplete DQT/DHT/SOF/SOS, RSTn
-  errors, files cut in the headers, in the scan and before the EOI) x 9 configurations x 2 stall
-  settings = **468 runs**: each must end with `frame_done`, the expected error bit and, for header
+  errors, files cut in the headers, in the scan, before the EOI and inside a comment after the scan,
+  impossible segment lengths, DRI lengths other than 4, repeated component ids, AC symbols outside
+  the baseline domain, libjpeg 9 colour transforms) x 9 configurations x 2 stall settings =
+  **900 runs**: each must end with `frame_done`, the expected error bit and, for header
   errors, no pixels.
 - **Colour converter**: exhaustive over all 2^24 (Y,Cb,Cr) inputs for both constant sets.
 - **On hardware**: on the EP2C5 every test photo decodes with libjpeg's checksum and exactly the
-  simulated clock count (`boards/ep2c5/fpga_jtag`); on the Artix-7 (fpgas.online) the owner's 12
+  simulated clock count (`boards/ep2c5/fpga_jtag`; re-run 2026-10-10 with the review fixes: the 12 photos
+  with the same clocks and checksums as before, the new RGB, comment-tail and malformed files as
+  expected, `bench/board_jtag_95mhz_2026-10-10.txt`); on the Artix-7 (fpgas.online) the owner's 12
   phone photos and 4:2:0 re-encodes of them decode identically to libjpeg 9e
-  (`boards/acorn_cle215`).
+  (`boards/acorn_cle215`). The boards report a clock count and a pixel checksum (a sum over the
+  pixels of `{(x^y)[7:0], R, G, B}`): it binds the pixel count but not each colour to its position;
+  the pixel-by-pixel evidence is the simulation of the same files, whose clock counts the boards
+  reproduce exactly.
 - **Portability**: `sv2v` + Yosys synthesize the compact and the fast raster + smoothing
   configurations for Xilinx 7-series and Lattice ECP5 and the fast MCU-order core for Xilinx
   7-series without errors; Verilator lint is clean with implicit-net warnings enabled.

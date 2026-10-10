@@ -67,12 +67,16 @@
    board (2026-10-05, `boards/acorn_cle215`, 150 MHz met for the board's -3 grade, 141.5 MHz on -2)
    decoded at the same time with pixels identical to libjpeg 9e; from their clock counts (each lane's
    decode time with an ideal input) that is 372 photos/s on adapter.jpg, 20.7x one laptop core, and
-   408 photos/s on the 24 photo files. The laptop's whole CPU, measured on the same 24 files
+   408 photos/s on the 24 photo files. Three assumptions go with these rates: the counts are active
+   decode clocks (the gated clocks leave out the waits for the 1 Mbaud UART); the 15 lanes decoded
+   copies of one file sent once, not 15 distinct files; and 408 is a schedule of the 24 single-file
+   times on 15 lanes, longest first (371.5 in file order, 470.8 with ideal balance). Feeding 372
+   adapter-sized photos/s takes about 1.3 GB/s of JPEG in and 14.5 GB/s of RGB out. The laptop's whole CPU, measured on the same 24 files
    (`bench_multicore.py`, `bench_multicore_2026-10-05.json`; libjpeg-turbo -nosmooth, one worker per
    logical CPU, performance profile): 23.4 photos/s on one core at 3.92 GHz, 62.6 on 4 cores and
    74.5 on 8 threads - under all-core load this 15 W chip holds only 2.35-2.63 GHz at ~18 W (93.0 and
    123.5 photos/s if it held 3.9 GHz). So the batch is 5.5x the whole laptop CPU as measured, 3.3x its
-   best case. Estimate only: about half of an ideal 16-core desktop CPU.
+   best case. Estimate only: about half of a 16-core CPU whose cores are each a hypothetical core 2.04x the laptop's (the libjpeg-turbo tjbench ratio of a Core Ultra 9 285K to the i7-8550U on OpenBenchmarking, 359 vs 176 Mpixel/s; not measured on these files).
 10. **Correction (2026-10-04).** Until then this file and README.md compared the FPGA with CPU
    times as measured while the laptop throttled (2.3-3.9 GHz), and with libjpeg-turbo's default
    (smoothing) mode: "libjpeg-turbo 1.9-2.7x faster than BEBCL-JPEG on the Artix-7", "faster than

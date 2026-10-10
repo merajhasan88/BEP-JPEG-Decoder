@@ -39,7 +39,10 @@ whole file has arrived until the frame is done. So at every decoder clock the in
 and `clocks` is the decode time with an ideal input, independent of the UART speed; it equals
 the cycle-exact simulation (`tb/` for this library, `bench/others/tb_other.cpp` for the others).
 The checksum is the sum over all pixels of `{(x ^ y)[7:0], R, G, B}` mod 2^32, as on the EP2C5
-boards, so it does not depend on the pixel order. A decoder that stalls is ended after 2^26 of its
+boards, so it does not depend on the pixel order. It binds the pixel count and catches most errors,
+but not colours exchanged between positions (the position and colour terms add separately); the
+pixel-by-pixel comparison with libjpeg 9e is the simulation of the same files, whose clock counts the
+board reproduces. New harnesses use a position-binding hash and read whole images back. A decoder that stalls is ended after 2^26 of its
 clocks without a pixel (flag `watchdog`), so the next file still runs.
 
 Protocol (8N1): host to FPGA `55 AA 'J' 'P' len[31:0]` (big-endian) and the file; FPGA to host,
@@ -183,12 +186,17 @@ of `uart_bench_core.sv`, the lane number in byte 5) comes back as soon as it has
   IMG20260716020424_420.jpg 3,305,261 clocks).
 - **Throughput** (from the measured counts): 15 adapter.jpg in 40.33 ms, 372 photos/s or 4.83
   Gpixel/s, 20.7x one laptop core at a steady 3.9 GHz (libjpeg-turbo -nosmooth, the fastest CPU
-  decoder on this photo, 55.5 ms) and about 10x the fastest desktop core (estimate: 2.04x the laptop
-  core, libjpeg-turbo tjbench on OpenBenchmarking). On the 24 photo files (each file's measured
-  count, spread over the 15 lanes) 408 photos/s, 5.5x the laptop's whole CPU measured on the same
+  decoder on this photo, 55.5 ms) and about 10x a hypothetical core 2.04x the laptop's (the libjpeg-turbo tjbench ratio of a Core Ultra 9 285K to the i7-8550U on OpenBenchmarking, 359 vs 176 Mpixel/s; not measured on these files). On the 24 photo files (each file's
+  measured count, spread over the 15 lanes, longest first) 408 photos/s (371.5 in file order, 470.8
+  with ideal balance), 5.5x the laptop's whole CPU measured on the same
   files (74.5 photos/s on 4 cores / 8 threads at 2.35 GHz, its ~18 W limit; `../../bench/bench_multicore.py`).
   A real system has to feed every lane at full speed (here the 1 Mbaud UART cannot; the lanes'
-  clocks pause while they wait).
+  clocks pause while they wait: the adapter.jpg upload took 35.7 s, its decode 40.33 ms): 372
+  adapter-sized photos/s need about 1.3 GB/s of JPEG in and 14.5 GB/s of RGB out. The 15 lanes
+  decoded copies of one file sent once (broadcast), not 15 distinct files; these are compute rates.
+- **Sources of the results.** Single-lane runs: the 24 files with the RTL before `6846718` (the two
+  xsim fixes), the final bitstream (3 files) with `6846718`; the 15-lane batch with `d6448a2`, before
+  the UART-core change `6bf75dd`.
 
 ```sh
 # build (three processes; VIVADO_THREADS, VIVADO_EFFORT=high as for build.tcl)

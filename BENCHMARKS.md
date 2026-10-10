@@ -12,7 +12,7 @@ decoder (FPGA): the time to get the file in and the pixels out is not included.*
 |---|---|
 | Images | the owner's own photos (4000x3000 phone photos of a screen, a 3120x4160 4:2:2 photo, a 1944x2592 4:4:4 photo), three small files made from them, and donald.jpg (2048x1365, the photo used since the project started). Of these only `test_images/adapter.jpg` (the 3120x4160 photo) and the two `adp_`/`board_` files are in the repository; `scr_320x240_q90_420` was made from a screen photo, and the test set now has `adp_320x240_q90_420` (same settings, made from adapter.jpg) instead. `bench/run_bench.py` measures the files in `test_images/` by default |
 | CPU | Intel Core i7-8550U (Kaby Lake R, 4 cores / 8 threads, 1.8 GHz base, 4.0 GHz turbo), Ubuntu 22.04 |
-| CPU clock | the laptop's `performance` power profile, held for the CPU runs (`BENCH_POWER_PROFILE=performance python3 run_bench.py`); average clock measured with `perf stat` during every run: 3.4-3.9 GHz (the laptop throttles), so every comparison with the FPGA uses the CPU times rescaled to a steady 3.9 GHz from each run's cycle count (column "ms at 3.9 GHz"), the CPU's best case. The laptop is normally in its `power-saver` profile (~1 GHz): earlier versions of this file were measured that way without anyone noticing, which made every CPU decoder look about 4-5x slower (see "Correction" below) |
+| CPU clock | the laptop's `performance` power profile, held for the CPU runs (`BENCH_POWER_PROFILE=performance python3 run_bench.py`); average clock measured with `perf stat` during every run: 3.4-3.9 GHz (the laptop throttles), so every comparison with the FPGA uses the CPU times rescaled to a steady 3.9 GHz from each run's cycle count (column "ms at 3.9 GHz"), the CPU's best case (it assumes the time scales with the clock, as it does while memory stalls are negligible; it is not a run at 3.9 GHz - the raw times and clocks of every run are kept in the JSON results). FFmpeg's clock was, until 2026-10-10, that of its last trial rather than of the fastest trial it reports (fixed in `run_bench.py`; its rescaled times await a re-run). The laptop is normally in its `power-saver` profile (~1 GHz): earlier versions of this file were measured that way without anyone noticing, which made every CPU decoder look about 4-5x slower (see "Correction" below) |
 | CPU decoders | libjpeg-turbo 2.1.2 (C API, `-O2 -march=native` harness), libjpeg 9e (built by `bench/tools.py`), stb_image v2.27, Pillow 9.0.1, OpenCV 4.7.0 (`cv2.setNumThreads(1)`), FFmpeg 4.4.2 (its own mjpeg decoder, `-threads 1`, converting to RGB24 like the others); on the 2026-10-04 photo run also zune-jpeg 0.4.21 (Rust, run-time SIMD, built with Rust 1.99) and Go 1.27.1's standard `image/jpeg` (YCbCr converted to RGBA with `image/draw`); each pinned to one core (`taskset -c 3`), repeated in ~0.1 s batches for >= 1.5 s, median batch reported |
 | This decoder | the fast core (`FAST=1`, MCU order, RGB) at 95 MHz on the EP2C5 (`boards/ep2c5/fpga_jtag`, 4,473 of 4,608 LEs at the time, timing met at 95 MHz): **clock counts measured on the board** with the decoder clock gated so that streaming time is excluded, identical to the cycle-exact simulation for every image; and the compact core (`FAST=0`, `boards/ep2c5/fpga`, 50 MHz) from simulation |
 | Output | CPU decoders: RGB, raster order (libjpeg-turbo default and Pillow/OpenCV with smoothed chroma, `-nosmooth` and this decoder with replicated chroma: same pixels as libjpeg 9e `djpeg -nosmooth`); this decoder: RGB in MCU order (8x8 / 16x16 tiles, each pixel tagged with x, y) |
@@ -214,7 +214,9 @@ same remote board, and on 2026-10-04 this library's wide core (`FAST=2`, DUT 3) 
 XC7A200T) at [fpgas.online](https://fpgas.online) (Welland site), each in the same UART harness
 (`boards/acorn_cle215/uart_bench_core.sv`): the file arrives over the Raspberry Pi's UART, the
 decoder's clock is gated so that it only runs while its next input is waiting, and the board
-reports the decoder's own clock count and a checksum of its pixels. Each decoder was built with
+reports the decoder's own clock count and a checksum of its pixels (a sum over the pixels of
+`{(x^y)[7:0], R, G, B}`: it binds the pixel count, not each colour to its position - the pixel-exact
+comparison is the simulation of the same files, whose clock counts the board reproduces). Each decoder was built with
 Vivado 2026.1 at a clock it meets (-2 speed grade timing). Files: the owner's 12 phone photos
 (4:2:2, with EXIF thumbnails) and 4:2:0 re-encodes of them (`cjpeg -baseline -quality 90 -sample
 2x2`, no metadata), because core_jpeg does not support 4:2:2. The other decoders' board results
@@ -382,12 +384,16 @@ BEBCL-JPEG `FAST=2` (the wide core) on the Artix-7 at 150 MHz takes 0.64-0.80x t
    board (2026-10-05, `boards/acorn_cle215`, 150 MHz met for the board's -3 grade, 141.5 MHz on -2)
    decoded at the same time with pixels identical to libjpeg 9e; from their clock counts (each lane's
    decode time with an ideal input) that is 372 photos/s on adapter.jpg, 20.7x one laptop core, and
-   408 photos/s on the 24 photo files. The laptop's whole CPU, measured on the same 24 files
+   408 photos/s on the 24 photo files. Three assumptions go with these rates: the counts are active
+   decode clocks (the gated clocks leave out the waits for the 1 Mbaud UART); the 15 lanes decoded
+   copies of one file sent once, not 15 distinct files; and 408 is a schedule of the 24 single-file
+   times on 15 lanes, longest first (371.5 in file order, 470.8 with ideal balance). Feeding 372
+   adapter-sized photos/s takes about 1.3 GB/s of JPEG in and 14.5 GB/s of RGB out. The laptop's whole CPU, measured on the same 24 files
    (`bench_multicore.py`, `bench_multicore_2026-10-05.json`; libjpeg-turbo -nosmooth, one worker per
    logical CPU, performance profile): 23.4 photos/s on one core at 3.92 GHz, 62.6 on 4 cores and
    74.5 on 8 threads - under all-core load this 15 W chip holds only 2.35-2.63 GHz at ~18 W (93.0 and
    123.5 photos/s if it held 3.9 GHz). So the batch is 5.5x the whole laptop CPU as measured, 3.3x its
-   best case. Estimate only: about half of an ideal 16-core desktop CPU.
+   best case. Estimate only: about half of a 16-core CPU whose cores are each a hypothetical core 2.04x the laptop's (the libjpeg-turbo tjbench ratio of a Core Ultra 9 285K to the i7-8550U on OpenBenchmarking, 359 vs 176 Mpixel/s; not measured on these files).
 10. **Correction (2026-10-04).** Until then this file and README.md compared the FPGA with CPU
    times as measured while the laptop throttled (2.3-3.9 GHz), and with libjpeg-turbo's default
    (smoothing) mode: "libjpeg-turbo 1.9-2.7x faster than BEBCL-JPEG on the Artix-7", "faster than
