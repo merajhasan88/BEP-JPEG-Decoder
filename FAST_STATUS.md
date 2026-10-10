@@ -465,6 +465,9 @@ the same clock counts and checksums as on 2026-10-04 (the fixes cost nothing on 
 RGB-coded file and the comment-tail file with libjpeg 9e's checksum; six of the new malformed cases with
 their expected error bits (a file ending inside a comment after its scan: ERR_TRUNC with libjpeg's
 pixels). The board-tested bitstreams of 2026-10-04 are kept in `boards/ep2c5/*/output_files_2026-10-04/`.
+Also re-run on the fixed RTL the same evening: the SystemVerilog testbench on Verilator (`tb/run_tests.sh`),
+all 3,060 runs; the wide core on the 24 photo files (`model/perf/check_wide.py`), identical to libjpeg 9e
+with the clock counts of 2026-10-04 (`model/perf/wide_photos_sim_2026-10-04.json`), file for file.
 
 ## 8. Open items (in order)
 
