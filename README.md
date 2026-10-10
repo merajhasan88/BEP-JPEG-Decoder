@@ -13,8 +13,9 @@ samples), which is what cameras, phones and almost all software write.
   Cyclone II (EP2C5, 4,608 logic elements) and a current Xilinx Artix-7, and builds with Quartus,
   Vivado and Yosys (Lattice ECP5).
 - **Least clocks per pixel** among the open-source FPGA JPEG decoders measured (below): 1.0-2.4
-  clocks per pixel for the fast core, 0.25-0.56 on phone photos for the wide core (`FAST=2`, four
-  pixels per clock), which on an Artix-7 at 150 MHz decodes a 12-megapixel photo faster than any CPU
+  clocks per pixel for the fast core, 0.25-0.56 on phone photos for the wide core (`FAST=2`, up to four
+  pixels per output beat; how many per clock it reaches depends on the image, see "Performance by image"
+  in BENCHMARKS.md), which on an Artix-7 at 150 MHz decodes a 12-megapixel photo faster than any CPU
   decoder on one laptop core.
 
 Every build option is verified **bit for bit** against a reference decoder:
@@ -172,7 +173,7 @@ bytes in ─► jpeg_parser ─► table RAMs (DQT, Huffman MAXCODE/VALPTR, HUFF
 (the compact core; the `FAST=1` core has the same structure with a 32-bit bit window, lookahead
 Huffman tables, a 2-lane pipelined IDCT and 1-pixel-per-clock output stages; the `FAST=2` core
 decodes one Huffman symbol per clock, transforms a block in 8 clocks with two pipelined 1-D IDCTs
-and emits four pixels per clock, in MCU order.)
+and emits up to four pixels per output beat (at most one beat per clock), in MCU order.)
 
 ### Interface (`rtl/jpeg_decoder.sv`)
 

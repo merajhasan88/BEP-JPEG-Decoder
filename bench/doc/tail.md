@@ -60,7 +60,7 @@
    counts identical to the simulation. That is 0.64-0.80x the time of libjpeg-turbo -nosmooth on one
    laptop core at a steady 3.9 GHz (1.24-1.57x faster) and 0.64-0.88x the time of the fastest CPU
    decoder on each photo (libjpeg-turbo, or FFmpeg on three files). It decodes one Huffman symbol
-   per clock and four pixels per clock in 6,211 LUTs and 33 DSPs of the XC7A200T (with the harness);
+   per clock and up to four pixels per output beat in 6,211 LUTs and 33 DSPs of the XC7A200T (with the harness);
    at 131 MHz or more it would still beat every CPU decoder on every photo. Single-image time on one
    CPU core is the comparison here: several CPU cores decoding several photos at once outrun one
    decoder in throughput. Several decoders side by side answer that: 15 wide decoders on the same

@@ -2,7 +2,8 @@
 """Assemble ../BENCHMARKS.md from doc/head.md, the per-image tables (bench_report.py bench.json
 [bench_powersaver.json]),
 doc/middle.md, the FPGA-decoder comparison (others/report.py), the Artix-7 board run
-(doc/artix7.md + boards/acorn_cle215/report.py) and doc/tail.md.
+(doc/artix7.md + boards/acorn_cle215/report.py), the photos (doc/photos.md + photos_report.py), the
+clocks by image (doc/perf.md + perf_by_image.py report perf_by_image_2026-10-10.json) and doc/tail.md.
 usage: make_benchmarks_md.py [bench.json]"""
 import os, sys, subprocess
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -18,8 +19,12 @@ artix = subprocess.run(["python3", os.path.join(acorn, "report.py"), os.path.joi
 # the CPU decoders on the same photos (bench_photos_2026-10-04.json) against the FPGA decoders
 photos = subprocess.run(["python3", os.path.join(HERE, "photos_report.py"), os.path.join(HERE, "bench_photos_2026-10-04.json"),
                          os.path.join(acorn, "results_2026-10-04.json")], capture_output=True, text=True, check=True).stdout
+# the fast and wide cores' clocks against size, subsampling, quality and compressed bits per pixel
+perf = subprocess.run(["python3", os.path.join(HERE, "perf_by_image.py"), "report", os.path.join(HERE, "perf_by_image_2026-10-10.json")],
+                      capture_output=True, text=True, check=True).stdout
 parts = [open(os.path.join(HERE, "doc", "head.md")).read(), tables, open(os.path.join(HERE, "doc", "middle.md")).read(),
          others, open(os.path.join(HERE, "doc", "artix7.md")).read() + "\n" + artix,
-         open(os.path.join(HERE, "doc", "photos.md")).read() + "\n" + photos, open(os.path.join(HERE, "doc", "tail.md")).read()]
+         open(os.path.join(HERE, "doc", "photos.md")).read() + "\n" + photos,
+         open(os.path.join(HERE, "doc", "perf.md")).read() + "\n" + perf, open(os.path.join(HERE, "doc", "tail.md")).read()]
 open(os.path.join(HERE, "..", "BENCHMARKS.md"), "w").write("\n".join(p.rstrip("\n") + "\n" for p in parts))
 print("wrote BENCHMARKS.md")

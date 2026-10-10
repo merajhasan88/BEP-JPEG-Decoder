@@ -315,6 +315,98 @@ BEBCL-JPEG (`FAST=1`) on the Artix-7 takes 2.22-3.17x the time of libjpeg-turbo 
 
 BEBCL-JPEG `FAST=2` (the wide core) on the Artix-7 at 150 MHz takes 0.64-0.80x the time of libjpeg-turbo -nosmooth at 3.9 GHz (1.24-1.57x faster) and 0.64-0.88x that of the fastest CPU decoder on each photo; 0.255-0.417 clocks/pixel.
 
+## Performance by image
+
+Four pixels per output beat is the wide core's peak, not its rate (review of 2026-10-10). The tables give
+the fast (`FAST=1`) and wide (`FAST=2`) cores' clocks in simulation (Verilator, MCU order, RGB output),
+split into the **setup**, until `frame_start` (the headers, read at a byte per clock, and the Huffman
+lookahead tables built from them), and the **scan**, from `frame_start` to the image's EOI. Measured by
+`bench/perf_by_image.py` (`bench/perf_by_image_2026-10-10.json`); the photos' clocks are those of
+`model/perf/wide_photos_sim_2026-10-04.json`, which the RTL with the review's fixes reproduced exactly on
+2026-10-10.
+
+- **Small images: the latency is the setup**, 682-2,025 clocks before the first pixel in both cores
+  (682-842 for the grey images with two Huffman tables, 1,321-1,639 for the colour ones with four,
+  2,025 when an EXIF thumbnail has to be skipped). A 1x1 image takes 1,721 clocks on the wide core: 11.5 us at 150 MHz.
+- **Large images: the rate follows the compressed size.** On the 24 photo files the wide core takes 0.255
+  clocks per pixel at 0.5 compressed bits per pixel (3.9 pixels per clock, close to the output's peak of
+  4) and up to 0.561 at 2.7 bits per pixel (1.8 pixels per clock), where the Huffman decoder, one symbol
+  per clock, sets the pace. 4:2:2 files have a third more blocks per pixel than 4:2:0 ones and mostly
+  need more clocks at the same bits per pixel.
+- The fast core: 1.0-1.8 clocks per pixel on the photos; 1.0-3.0 in the scans of the corpus images from
+  8x8 pixels up.
+
+Small files (the corpus): the clocks until the frame starts are the headers - read at a byte per clock -
+and the Huffman lookahead tables built from them; the scan's clocks per pixel are the rate.
+
+| file | size | subsampling | quality | bits/pixel | setup clocks | scan clk/px fast / wide | total clocks fast / wide | wide total clk/px |
+|---|---|---|---:|---:|---:|---|---|---:|
+| adp_1x1_q50_420 | 1x1 | 4:2:0 | 50 | 48.00 | 1,632 | 262.00 / 89.00 | 1,894 / 1,721 | 1721.00 |
+| adp_3x5_q50_420 | 3x5 | 4:2:0 | 50 | 10.13 | 1,632 | 22.40 / 7.87 | 1,968 / 1,750 | 116.67 |
+| adp_5x3_q50_420 | 5x3 | 4:2:0 | 50 | 10.13 | 1,632 | 22.67 / 7.87 | 1,972 / 1,750 | 116.67 |
+| adp_4x6_q50_422 | 4x6 | 4:2:2 | 50 | 7.33 | 1,632 | 11.54 / 4.04 | 1,909 / 1,729 | 72.04 |
+| adp_8x8_q10_gray | 8x8 | grey | 10 | 0.88 | 835 | 2.97 / 1.14 | 1,025 / 908 | 14.19 |
+| adp_13x11_q40_gray | 13x11 | grey | 40 | 2.46 | 835 | 2.50 / 0.90 | 1,192 / 964 | 6.74 |
+| adp_16x16_q25_420 | 16x16 | 4:2:0 | 25 | 1.16 | 1,321 | 2.42 / 0.73 | 1,941 / 1,509 | 5.89 |
+| adp_16x16_q25_gray | 16x16 | grey | 25 | 1.09 | 682 | 1.55 / 0.50 | 1,080 / 810 | 3.16 |
+| adp_17x33_q40_420 | 17x33 | 4:2:0 | 40 | 2.27 | 1,632 | 2.81 / 0.79 | 3,206 / 2,076 | 3.70 |
+| adp_33x18_q40_440 | 33x18 | 4:4:0 | 40 | 2.40 | 1,632 | 2.75 / 0.74 | 3,263 / 2,074 | 3.49 |
+| adp_32x32_q25_420 | 32x32 | 4:2:0 | 25 | 1.09 | 1,325 | 1.33 / 0.37 | 2,692 / 1,700 | 1.66 |
+| adp_32x32_q25_444 | 32x32 | 4:4:4 | 25 | 1.27 | 1,328 | 1.88 / 0.45 | 3,253 / 1,785 | 1.74 |
+| adp_40x40_q40_lumasub | 40x40 | mixed | 40 | 0.98 | 1,632 | 1.89 / 0.47 | 4,653 / 2,390 | 1.49 |
+| adp_45x37_q30_420_rst2 | 45x37 | 4:2:0 rst | 30 | 1.35 | 1,639 | 1.36 / 0.40 | 3,902 / 2,313 | 1.39 |
+| adp_45x37_q30_422 | 45x37 | 4:2:2 | 30 | 1.35 | 1,632 | 1.47 / 0.38 | 4,086 / 2,263 | 1.36 |
+| adp_45x37_q30_422_exifthumb | 45x37 | 4:2:2 | 30 | 1.35 | 2,025 | 1.47 / 0.38 | 4,478 / 2,656 | 1.60 |
+| adp_45x37_q30_440_rst1row | 45x37 | 4:4:0 rst | 30 | 1.41 | 1,639 | 1.69 / 0.44 | 4,458 / 2,374 | 1.43 |
+| adp_45x37_q30_gray_rst3 | 45x37 | grey rst | 30 | 1.24 | 842 | 1.09 / 0.36 | 2,663 / 1,441 | 0.87 |
+| adp_48x40_q40_mixed | 48x40 | mixed | 40 | 1.52 | 1,632 | 1.62 / 0.46 | 4,741 / 2,519 | 1.31 |
+| adp_40x50_q30_420_rst3 | 40x50 | 4:2:0 rst | 30 | 1.32 | 1,639 | 1.48 / 0.41 | 4,593 / 2,464 | 1.23 |
+| adp_64x64_q25_420 | 64x64 | 4:2:0 | 25 | 0.86 | 1,334 | 1.09 / 0.28 | 5,780 / 2,491 | 0.61 |
+| wide_384x12_q20_444 | 384x12 | 4:4:4 | 20 | 0.90 | 1,632 | 2.19 / 0.52 | 11,725 / 4,033 | 0.88 |
+| wide_576x10_q20_422 | 576x10 | 4:2:2 | 20 | 0.80 | 1,632 | 1.75 / 0.42 | 11,729 / 4,059 | 0.70 |
+| wide_592x10_q20_422 | 592x10 | 4:2:2 | 20 | 0.78 | 1,632 | 1.74 / 0.42 | 11,949 / 4,110 | 0.69 |
+| wide_1152x6_q20_gray | 1152x6 | grey | 20 | 0.45 | 835 | 1.04 / 0.28 | 7,992 / 2,754 | 0.40 |
+| wide_1160x6_q20_gray | 1160x6 | grey | 20 | 0.46 | 835 | 1.04 / 0.28 | 8,041 / 2,767 | 0.40 |
+| wide_352x20_q20_420 | 352x20 | 4:2:0 | 20 | 0.71 | 1,632 | 1.46 / 0.36 | 11,909 / 4,152 | 0.59 |
+| wide_368x20_q20_420 | 368x20 | 4:2:0 | 20 | 0.71 | 1,632 | 1.46 / 0.36 | 12,381 / 4,273 | 0.58 |
+| board_352x32_q6_420 | 352x32 | 4:2:0 | 6 | 0.28 | 1,632 | 1.03 / 0.26 | 13,200 / 4,579 | 0.41 |
+| adp_256x64_q98_gray | 256x64 | grey | 98 | 4.49 | 835 | 2.33 / 0.79 | 38,973 / 13,840 | 0.84 |
+| adp_160x120_q95_444 | 160x120 | 4:4:4 | 95 | 4.89 | 1,632 | 2.96 / 0.93 | 58,497 / 19,559 | 1.02 |
+| adp_240x320_q95_422_rst4 | 240x320 | 4:2:2 rst | 95 | 3.76 | 1,639 | 2.18 / 0.74 | 169,093 / 58,235 | 0.76 |
+| adp_320x240_q90_420 | 320x240 | 4:2:0 | 90 | 2.28 | 1,632 | 1.46 / 0.45 | 113,989 / 36,536 | 0.48 |
+
+Photos (12 MP; the header setup is under 0.1 % of their clocks): clocks per pixel against the
+compressed bits per pixel, by subsampling.
+
+| file | subsampling | quality | MB | bits/pixel | fast clk/px | wide clk/px | wide pixels per clock |
+|---|---|---:|---:|---:|---:|---:|---:|
+| IMG20260716020409_420.jpg | 4:2:0 | 90 | 0.79 | 0.49 | 1.006 | 0.255 | 3.92 |
+| IMG20260716020424_420.jpg | 4:2:0 | 90 | 0.93 | 0.57 | 1.005 | 0.255 | 3.93 |
+| IMG20260716020422_420.jpg | 4:2:0 | 90 | 0.96 | 0.59 | 1.005 | 0.255 | 3.93 |
+| IMG20260716020409.jpg | 4:2:2 | 95 | 1.66 | 0.84 | 1.184 | 0.295 | 3.39 |
+| IMG20260716020424.jpg | 4:2:2 | 95 | 1.67 | 0.84 | 1.184 | 0.296 | 3.37 |
+| IMG20260716020422.jpg | 4:2:2 | 95 | 1.71 | 0.87 | 1.187 | 0.298 | 3.35 |
+| IMG20260612210949_420.jpg | 4:2:0 | 90 | 1.60 | 0.99 | 1.018 | 0.262 | 3.81 |
+| IMG20260723160735_420.jpg | 4:2:0 | 90 | 1.64 | 1.01 | 1.060 | 0.285 | 3.51 |
+| IMG20260425135544_420.jpg | 4:2:0 | 90 | 2.14 | 1.32 | 1.152 | 0.328 | 3.05 |
+| IMG20260425141210_420.jpg | 4:2:0 | 90 | 2.23 | 1.38 | 1.106 | 0.316 | 3.17 |
+| adapter_420.jpg | 4:2:0 | 90 | 2.24 | 1.38 | 1.074 | 0.321 | 3.12 |
+| IMG20260723160735.jpg | 4:2:2 | 95 | 2.62 | 1.43 | 1.338 | 0.362 | 2.76 |
+| IMG20260612210949.jpg | 4:2:2 | 95 | 2.69 | 1.47 | 1.310 | 0.348 | 2.88 |
+| IMG20260523191343_420.jpg | 4:2:0 | 90 | 2.41 | 1.48 | 1.156 | 0.330 | 3.03 |
+| IMG20260405182829_420.jpg | 4:2:0 | 90 | 2.41 | 1.48 | 1.174 | 0.380 | 2.63 |
+| IMG20260405182833_420.jpg | 4:2:0 | 90 | 2.52 | 1.55 | 1.207 | 0.396 | 2.53 |
+| IMG20260425135544.jpg | 4:2:2 | 95 | 3.31 | 1.85 | 1.475 | 0.426 | 2.35 |
+| IMG20260425141210.jpg | 4:2:2 | 95 | 3.46 | 1.95 | 1.469 | 0.442 | 2.26 |
+| IMG20260425135628_420.jpg | 4:2:0 | 90 | 3.22 | 1.99 | 1.366 | 0.417 | 2.40 |
+| adapter.jpg | 4:2:2 | 95 | 3.53 | 1.99 | 1.482 | 0.466 | 2.15 |
+| IMG20260523191343.jpg | 4:2:2 | 95 | 3.72 | 2.10 | 1.544 | 0.472 | 2.12 |
+| IMG20260405182829.jpg | 4:2:2 | 95 | 3.73 | 2.11 | 1.611 | 0.527 | 1.90 |
+| IMG20260405182833.jpg | 4:2:2 | 95 | 3.88 | 2.20 | 1.659 | 0.546 | 1.83 |
+| IMG20260425135628.jpg | 4:2:2 | 95 | 4.73 | 2.73 | 1.780 | 0.561 | 1.78 |
+
+Setup on the corpus: 682-2,025 clocks (both cores). Photos: wide 0.255-0.561 clocks per pixel, i.e. 1.78-3.93 pixels per clock against the output's peak of 4.
+
 
 ## What the numbers say
 
@@ -377,7 +469,7 @@ BEBCL-JPEG `FAST=2` (the wide core) on the Artix-7 at 150 MHz takes 0.64-0.80x t
    counts identical to the simulation. That is 0.64-0.80x the time of libjpeg-turbo -nosmooth on one
    laptop core at a steady 3.9 GHz (1.24-1.57x faster) and 0.64-0.88x the time of the fastest CPU
    decoder on each photo (libjpeg-turbo, or FFmpeg on three files). It decodes one Huffman symbol
-   per clock and four pixels per clock in 6,211 LUTs and 33 DSPs of the XC7A200T (with the harness);
+   per clock and up to four pixels per output beat in 6,211 LUTs and 33 DSPs of the XC7A200T (with the harness);
    at 131 MHz or more it would still beat every CPU decoder on every photo. Single-image time on one
    CPU core is the comparison here: several CPU cores decoding several photos at once outrun one
    decoder in throughput. Several decoders side by side answer that: 15 wide decoders on the same
