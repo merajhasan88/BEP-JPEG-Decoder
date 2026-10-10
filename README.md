@@ -71,7 +71,7 @@ core_jpeg and H. Ishihara's aq_djpeg (same harness, same board, same files):
 - **Three cores, one interface.** A compact core (3.4k LEs, ~13.6 clocks/pixel), a fast core
   (~1-2.4 clocks/pixel, fits the EP2C5) and a wide core (~6k LUTs, 0.25-0.56 clocks/pixel), chosen
   with one parameter.
-- **Verified in depth.** Two independent testbenches (C++ and SystemVerilog) run the same 2,376
+- **Verified in depth.** Two independent testbenches (C++ and SystemVerilog) run the same 3,060
   checks (bit-exact pixels, files back to back, malformed files); gate-level simulation of the
   placed design; Verilator and Vivado's simulator; hardware from two vendors.
 
@@ -302,7 +302,8 @@ Both regressions compare against the reference images in `tb/golden/` (made by t
 - **Images back to back without reset** (`tb/run_stream_tests.py`): 13 scenarios = 234 runs, among
   them malformed files each followed by a valid image (its own error, the next frame exact).
 - **Two independent testbenches**: the C++ harness (`make test`) and the SystemVerilog testbench
-  (`tb/run_tests.sh`) run the same 2,376 checks and both pass all of them on Verilator; on Vivado's
+  (`tb/run_tests.sh`) run the same 3,060 checks (1,926 + 234 + 900) and both pass all of them on
+  Verilator (2026-10-10); on Vivado's
   xsim the SystemVerilog testbench passes a 396-run subset of the compact and fast cores (MCU and
   raster output, smoothing, malformed files) and 264 runs of the wide and fast cores. xsim's stricter
   4-state semantics found problems that Verilator, Quartus and the hardware never showed: a loop

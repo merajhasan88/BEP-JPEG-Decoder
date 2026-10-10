@@ -162,9 +162,14 @@ Owner: "In parallel (pun intended) lets find a way around Huffman loop limitatio
     host <-> HBM paths (no build: about 30 minutes of the f2.6xlarge); (b) write the harness here and
     simulate it with Verilator against our own models of PCIS, OCL and HBM; (c) the DCP build on AWS's
     build image, where the shell simulation can also run first; (d) the run, with full readback.
-  - **Built so far (2026-10-10):** the part every memory-based design needs, `boards/aws_f2/mem_lane.sv`:
-    one wide decoder fed from memory by an AXI4 read master, its output written as {x, y, 4 x RGB}
-    records by an AXI4 write master, with clocks, waits, error bits and a position-binding hash. In
-    Verilator against an AXI4 memory model with random gaps on every channel: 73/73 (the corpus and
-    three photos), every pixel identical to libjpeg 9e, each photo in the wide core's own clocks plus 74
-    of first read. The shell, HBM and the host program wait for the choice between the options above.
+  - **Built so far (2026-10-10, `boards/aws_f2/`):** the vendor-neutral part of option 1, in Verilator.
+    `mem_lane.sv`: one wide decoder fed from memory by an AXI4 read master, its output written as
+    {x, y, 4 x RGB} records by an AXI4 write master, with clocks, waits, error bits and a position-binding
+    hash; jobs back to back, abort, done only with nothing in flight; 256- or 512-bit data.
+    `f2_regs.sv` + `jpeg_f2_engine.sv`: NL lanes, each with its own AXI4 port (one HBM channel each), and
+    the host's registers on AXI-Lite (OCL): job, tag, start / abort, status, results, engine clock at
+    start and done. Tests against an AXI4 memory model with random gaps on every channel: lane 1,240 /
+    1,240 jobs (corpus, the 50 malformed cases, data after the EOI, no SOI, mid-frame aborts, output
+    overflow; two widths, four gap settings), engine 620 / 620 jobs in four batches as a host would run
+    them. Option 2 would replace the lanes' read side only; the registers stay. Not built: the shell,
+    HBM and clocking, the host program (on AWS's build image, after the owner's choice).

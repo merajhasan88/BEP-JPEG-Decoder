@@ -15,6 +15,13 @@
 // ID, addresses aligned to DW/8 bytes; one read burst in flight (the decoder takes at most a byte
 // per clock), up to WOUT write bursts in flight (records come at up to 16 bytes per clock); a burst's
 // write data follows its accepted address.
+// Jobs: the job inputs are sampled at an accepted start (start while busy is ignored), so the next
+// job may be written while one runs. The frame ends at the file's EOI (or, for a truncated file, at
+// its last byte); the bytes after it are not read. done comes when every burst in flight is complete
+// (read data in, write responses back), so a job's late read data can never reach the next job. A file
+// without an SOI never ends a frame (jpeg_parser: in_last before an SOI has no effect): the host aborts
+// such a job (job_abort: no new requests, the bursts in flight complete, then done with res_abort; the
+// records of an aborted job are incomplete).
 module mem_lane #(
   parameter int AW    = 64,
   parameter int DW    = 512,          // AXI data width in bits: 256 or 512
@@ -23,8 +30,9 @@ module mem_lane #(
 ) (
   input  logic          clk,
   input  logic          rst,
-  // job (held from start until done)
+  // job (sampled at an accepted start)
   input  logic          start,        // pulse: begin a job (ignored while busy)
+  input  logic          job_abort,        // pulse: end the running job (see the header)
   input  logic [AW-1:0] in_addr,
   input  logic [31:0]   in_len,       // bytes of the file
   input  logic [AW-1:0] out_addr,
@@ -34,6 +42,7 @@ module mem_lane #(
   output logic [12:0]   res_err,      // the decoder's error bits at frame_done
   output logic          res_ovf,      // records beyond out_max were dropped
   output logic          res_axi_err,  // an AXI response other than OKAY
+  output logic          res_abort,    // the job was aborted
   output logic [31:0]   res_cycles,   // clocks from start to frame_done
   output logic [31:0]   res_in_wait,  // of them: the decoder asked for input and had none
   output logic [31:0]   res_out_wait, // of them: an output beat waited for the writer
@@ -83,10 +92,12 @@ module mem_lane #(
   assign rready = 1'b1;                          // FIFO space was reserved before the burst was asked for
   assign bready = 1'b1;
 
-  logic          fin;                            // frame_done seen
+  logic [31:0]   len_r;                          // the job's file length
+  logic          fin;                            // frame_done seen (or the job aborted)
   logic          flushing;                       // fin and the last partial beat queued: drain the writes
-  logic          dec_rst;
-  always_ff @(posedge clk) dec_rst <= rst || (start && !busy);
+  logic          dec_rst;                        // the decoder's reset, in the first clock of every job: until it
+  always_ff @(posedge clk) dec_rst <= rst || (start && !busy);   // has acted, the decoder's outputs are the last job's
+
 
   // ================================================================ read: file -> beat FIFO -> bytes
   logic [AW-1:0] rd_addr;
@@ -107,7 +118,7 @@ module mem_lane #(
     if (13'(to_4k_r >> BB) < 13'(ar_n)) ar_n = 9'(to_4k_r >> BB);
   end
   logic          ar_issue, r_push;
-  assign ar_issue = busy && !ar_busy && !arvalid && (rd_left != 32'd0) && (32'(r_resv) + 32'(ar_n) <= 32'(FD));
+  assign ar_issue = busy && !fin && !ar_busy && !arvalid && (rd_left != 32'd0) && (32'(r_resv) + 32'(ar_n) <= 32'(FD));
   assign r_push   = rvalid && rready;
   // the serializer: one beat at a time, its bytes one per accepted clock
   logic [DW-1:0] cur;
@@ -116,12 +127,12 @@ module mem_lane #(
   logic [31:0]   fed;                            // bytes given to the decoder
   logic          in_valid, in_ready, in_last, take, used_up, r_pop;
   logic [7:0]    in_data;
-  assign in_valid = busy && cur_v && (fed < in_len);
+  assign in_valid = busy && !dec_rst && cur_v && (fed < len_r);
   assign in_data  = cur[8*cur_i +: 8];
-  assign in_last  = (fed + 32'd1 == in_len);
+  assign in_last  = (fed + 32'd1 == len_r);
   assign take     = in_valid && in_ready;
   assign used_up  = !cur_v || (take && (cur_i == BB'(BYTES - 1)));
-  assign r_pop    = busy && used_up && (rf_cnt != '0) && ((fed + (take ? 32'd1 : 32'd0)) < in_len);
+  assign r_pop    = busy && used_up && (rf_cnt != '0) && ((fed + (take ? 32'd1 : 32'd0)) < len_r);
 
   // ================================================================ the decoder
   logic        px_valid, px_ready, px_sof, px_eol, frame_start, frame_done;
@@ -159,7 +170,8 @@ module mem_lane #(
   logic [FB:0]   wf_free;                        // of them: not yet given to an AW burst
   logic [31:0]   out_max_beats, out_beats;       // room and beats queued so far
   logic          px_fire, pk_full, pk_last, w_push;
-  assign px_ready = busy && !fin && (wf_cnt < FB'(FD - 1));   // room for the beat this record may complete
+  assign px_ready = busy && !dec_rst && !fin && (wf_cnt < FB'(FD - 1));   // room for the beat this record may complete
+                                                 // (not from a decoder still holding an aborted job's beat)
   assign px_fire  = px_valid && px_ready;
   assign pk_full  = px_fire && (pk_n == (RB+1)'(RPW - 1));     // this record completes a beat
   assign pk_last  = fin && !flushing && (pk_n != '0) && (wf_cnt < (FB+1)'(FD));   // the last, partial beat
@@ -220,14 +232,14 @@ module mem_lane #(
   always_ff @(posedge clk) begin
     if (rst || (start && !busy)) begin
       busy <= !rst; done <= 1'b0; fin <= 1'b0; flushing <= 1'b0;
-      rd_addr <= in_addr; rd_left <= in_len; wr_addr <= out_addr;
+      rd_addr <= in_addr; rd_left <= in_len; len_r <= in_len; wr_addr <= out_addr;
       out_max_beats <= out_max >> BB; out_beats <= '0;
       arvalid <= 1'b0; araddr <= '0; arlen <= '0; ar_busy <= 1'b0;
       awvalid <= 1'b0; awaddr <= '0; awlen <= '0;
       rf_wp <= '0; rf_rp <= '0; rf_cnt <= '0; r_resv <= '0; cur <= '0; cur_v <= 1'b0; cur_i <= '0; fed <= '0;
       wf_wp <= '0; wf_rp <= '0; wf_cnt <= '0; wf_free <= '0; pk <= '0; pk_n <= '0;
       bq_wp <= '0; bq_rp <= '0; bq_cnt <= '0; b_out <= '0; w_left <= '0;
-      res_err <= '0; res_ovf <= 1'b0; res_axi_err <= 1'b0; res_cycles <= '0; res_in_wait <= '0; res_out_wait <= '0;
+      res_err <= '0; res_ovf <= 1'b0; res_axi_err <= 1'b0; res_abort <= 1'b0; res_cycles <= '0; res_in_wait <= '0; res_out_wait <= '0;
       res_pixels <= '0; res_records <= '0; res_hash <= '0; res_w <= '0; res_h <= '0;
     end else if (busy) begin
       // ---- read: a burst when the FIFO has room for it; the beats into the FIFO; one beat out to the serializer
@@ -251,15 +263,16 @@ module mem_lane #(
         else cur_i <= cur_i + 1'b1;
       end
       // ---- the decoder's results
-      if (frame_start) begin res_w <= img_w; res_h <= img_h; end
+      if (frame_start && !dec_rst) begin res_w <= img_w; res_h <= img_h; end
       if (!fin) begin
         res_cycles <= res_cycles + 32'd1;
-        if (in_ready && !in_valid && fed < in_len) res_in_wait <= res_in_wait + 32'd1;
-        if (px_valid && !px_ready) res_out_wait <= res_out_wait + 32'd1;
+        if (!dec_rst && in_ready && !in_valid && fed < len_r) res_in_wait <= res_in_wait + 32'd1;
+        if (!dec_rst && px_valid && !px_ready) res_out_wait <= res_out_wait + 32'd1;
       end
       if (px_fire) begin res_pixels <= res_pixels + 32'(px_n); res_records <= res_records + 32'd1; end
       if (h2) res_hash <= res_hash + hs;
-      if (frame_done) begin fin <= 1'b1; res_err <= dec_err; end
+      if (frame_done && !dec_rst) begin fin <= 1'b1; res_err <= dec_err; end
+      else if (job_abort && !fin) begin fin <= 1'b1; flushing <= 1'b1; res_abort <= 1'b1; res_err <= dec_err; end   // a partial beat is dropped
       // ---- records into beats; beats into the write FIFO (beyond out_max: dropped, res_ovf)
       if (px_fire) begin
         pk[128*pk_n[RB-1:0] +: 128] <= rec;
@@ -289,8 +302,9 @@ module mem_lane #(
       bq_cnt  <= bq_cnt + (aw_acc ? 1'b1 : 1'b0) - (bq_take ? 1'b1 : 1'b0);
       b_out   <= b_out + (aw_acc ? 1'b1 : 1'b0) - (b_fire ? 1'b1 : 1'b0);
       if (b_fire && bresp != 2'b00) res_axi_err <= 1'b1;
-      // ---- the end: frame done, every beat written and acknowledged, the hash complete
-      if (flushing && wf_cnt == '0 && bq_cnt == '0 && w_left == 9'd0 && b_out == '0 && !awvalid && !h1 && !h2) begin
+      // ---- the end: frame done, every beat written and acknowledged, no read burst in flight, the hash complete
+      if (flushing && wf_cnt == '0 && bq_cnt == '0 && w_left == 9'd0 && b_out == '0 && !awvalid && !arvalid && !ar_busy
+          && !h1 && !h2) begin
         busy <= 1'b0; done <= 1'b1;
       end
     end
