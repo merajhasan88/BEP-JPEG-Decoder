@@ -138,28 +138,37 @@ module jpeg_parser #(
                             // AC SSSS 1..10, or 0x00 (EOB) / 0xF0 (ZRL) (F.1.2.2.1)
   assign sym_bad = tbl[1] ? (in_data[3:0] > 4'd10 || (in_data[3:0] == 4'd0 && in_data != 8'h00 && in_data != 8'hF0))
                           : (in_data > 8'd11);
-  logic        len2;        // S_LEN_LO: the segment length is exactly 2 (no payload)
-  assign len2 = ({len[15:8], in_data} == 16'd2);
+  logic        len2, nopay; // S_LEN_LO: the segment length is exactly 2; at most 2 (no payload)
+  assign len2  = ({len[15:8], in_data} == 16'd2);
+  assign nopay = (len[15:8] == 8'd0) && (in_data <= 8'd2);
   logic [2:0]  rst_exp;     // expected RSTn number
   logic        scanned;     // this image has had a scan (its frame is under way or done)
   // colour space: JFIF APP0 / Adobe APP14 seen in this image (libjpeg's examine_app0 / examine_app14),
   // read while their segments are skipped: identifier at payload bytes 0-4, Adobe transform at byte 11
-  logic        saw_jfif, saw_adobe, adobe_t0, am;
-  logic [3:0]  ai;          // payload byte index while skipping (saturates at 15)
-  logic [7:0]  app_id;      // identifier byte expected at ai: "JFIF\0" (APP0), "Adobe" (APP14)
-  always_comb case (ai[2:0])
+  logic        saw_jfif, adobe0, am;   // JFIF APP0 seen; the last Adobe APP14 had transform 0; identifier matches
+  logic [7:0]  app_id;      // identifier byte expected at payload byte k (k counts the skipped bytes, up
+                            // to 15): "JFIF\0" (APP0), "Adobe" (APP14)
+  always_comb case (k[2:0])
     3'd0:    app_id = (mk == 8'hE0) ? 8'h4A : 8'h41;
     3'd1:    app_id = (mk == 8'hE0) ? 8'h46 : 8'h64;
     3'd2:    app_id = (mk == 8'hE0) ? 8'h49 : 8'h6F;
     3'd3:    app_id = (mk == 8'hE0) ? 8'h46 : 8'h62;
     default: app_id = (mk == 8'hE0) ? 8'h00 : 8'h65;
   endcase
-  logic        id_123, id_bgycc, id_rgb, id_bgrgb;
-  assign id_123   = (ci_reg[0] == 8'h01) && (ci_reg[1] == 8'h02) && (ci_reg[2] == 8'h03);
-  assign id_bgycc = (ci_reg[0] == 8'h01) && (ci_reg[1] == 8'h22) && (ci_reg[2] == 8'h23);
-  assign id_rgb   = (ci_reg[0] == 8'h52) && (ci_reg[1] == 8'h47) && (ci_reg[2] == 8'h42);
-  assign id_bgrgb = (ci_reg[0] == 8'h72) && (ci_reg[1] == 8'h67) && (ci_reg[2] == 8'h62);
-  assign cs_rgb   = (nf == 2'd3) && (id_rgb || (!id_123 && !id_bgycc && !id_bgrgb && !saw_jfif && saw_adobe && adobe_t0));
+  // component ids: 1,2,3 / BG_YCC 1,0x22,0x23 and 'R','G','B' / BG_RGB 'r','g','b' differ in bit 5 only
+  logic [6:0]  ci0_m, ci1_m, ci2_m;     // the ids without bit 5
+  logic        ycc_ids, rgb_ids, id_123, id_bgycc, id_rgb, id_bgrgb;
+  assign ci0_m    = {ci_reg[0][7:6], ci_reg[0][4:0]};
+  assign ci1_m    = {ci_reg[1][7:6], ci_reg[1][4:0]};
+  assign ci2_m    = {ci_reg[2][7:6], ci_reg[2][4:0]};
+  assign ycc_ids  = (ci0_m == 7'h01) && !ci_reg[0][5] && (ci1_m == 7'h02) && (ci2_m == 7'h03) && (ci_reg[1][5] == ci_reg[2][5]);
+  assign rgb_ids  = (ci0_m == 7'h32) && (ci1_m == 7'h27) && (ci2_m == 7'h22)
+                    && (ci_reg[0][5] == ci_reg[1][5]) && (ci_reg[1][5] == ci_reg[2][5]);
+  assign id_123   = ycc_ids && !ci_reg[1][5];
+  assign id_bgycc = ycc_ids &&  ci_reg[1][5];
+  assign id_rgb   = rgb_ids && !ci_reg[0][5];
+  assign id_bgrgb = rgb_ids &&  ci_reg[0][5];
+  assign cs_rgb   = (nf == 2'd3) && (id_rgb || (!ycc_ids && !rgb_ids && !saw_jfif && adobe0));
   // Annex C: code after the BITS(L) codes of length L.  libjpeg rejects a table when this reaches
   // 2^L at some length L (over-subscribed tree, or an all-ones code); the code value doubles
   // from each length to the next, so that happens exactly when it reaches 2^16 at some L <= 16.
@@ -277,7 +286,7 @@ module jpeg_parser #(
           // no frame until an SOF).  Tables persist, as abbreviated streams allow (B.5).
           if (in_data == 8'hD8) begin
             state <= S_MK_FF; soi <= 1'b1; ri <= '0; img_w <= '0; img_h <= '0; scanned <= 1'b0;
-            saw_jfif <= 1'b0; saw_adobe <= 1'b0; adobe_t0 <= 1'b0;
+            saw_jfif <= 1'b0; adobe0 <= 1'b0;
           end
           else if (in_data != 8'hFF) begin state <= S_SOI_FF; err_set[ERR_SYNC] <= 1'b1; end
         end
@@ -299,39 +308,33 @@ module jpeg_parser #(
         S_LEN_LO: if (consume) begin
           len[7:0] <= in_data;
           rem <= {len[15:8], in_data};
-          k <= '0; sj <= '0; ai <= '0; am <= 1'b1;
-          if ({len[15:8], in_data} <= 16'd2) begin                  // no payload
-            state <= S_MK_FF;
-            if (CHECKS) case (mk)                                     // see the header: lengths
-              8'hDB: if (!len2) err_set[ERR_DQT] <= 1'b1;
-              8'hC4: if (!len2) err_set[ERR_DHT] <= 1'b1;
-              8'hC0: err_set[ERR_FRAME] <= 1'b1;
-              8'hC1, 8'hC2, 8'hC3, 8'hC5, 8'hC6, 8'hC7, 8'hC9, 8'hCA, 8'hCB, 8'hCD, 8'hCE, 8'hCF:
-                     err_set[ERR_SOF_TYPE] <= 1'b1;
-              8'hDA: err_set[ERR_SCAN] <= 1'b1;
-              8'hDD: err_set[ERR_SYNC] <= 1'b1;
-              default: if (!len2) err_set[ERR_SYNC] <= 1'b1;
-            endcase
-          end else case (mk)
-            8'hDB: state <= S_DQT_PQTQ;
-            8'hC4: state <= S_DHT_TCTH;
-            8'hC0: state <= S_SOF_P;
-            8'hC1, 8'hC2, 8'hC3, 8'hC5, 8'hC6, 8'hC7, 8'hC9, 8'hCA, 8'hCB, 8'hCD, 8'hCE, 8'hCF:
-                   begin state <= S_SKIP; err_set[ERR_SOF_TYPE] <= 1'b1; end
-            8'hDD: if (CHECKS && {len[15:8], in_data} != 16'd4) begin err_set[ERR_SYNC] <= 1'b1; state <= S_SKIP; end
-                   else state <= S_DRI_HI;                            // Lr = 4 (B.2.4.4)
-            8'hDA: state <= S_SOS_NS;
-            8'hF8: begin state <= S_SKIP; err_set[ERR_SOF_TYPE] <= 1'b1; end   // LSE: libjpeg 9's colour transform
-            default: state <= S_SKIP;
+          k <= '0; sj <= '0; am <= 1'b1;
+          // no payload (length 2 or, impossible, less): see the header (lengths) for the errors
+          case (mk)
+            8'hDB: if (nopay) begin state <= S_MK_FF; if (CHECKS && !len2) err_set[ERR_DQT] <= 1'b1; end
+                   else state <= S_DQT_PQTQ;
+            8'hC4: if (nopay) begin state <= S_MK_FF; if (CHECKS && !len2) err_set[ERR_DHT] <= 1'b1; end
+                   else state <= S_DHT_TCTH;
+            8'hC0: if (nopay) begin state <= S_MK_FF; if (CHECKS) err_set[ERR_FRAME] <= 1'b1; end
+                   else state <= S_SOF_P;
+            8'hC1, 8'hC2, 8'hC3, 8'hC5, 8'hC6, 8'hC7, 8'hC9, 8'hCA, 8'hCB, 8'hCD, 8'hCE, 8'hCF, 8'hF8:
+                   begin state <= nopay ? S_MK_FF : S_SKIP; err_set[ERR_SOF_TYPE] <= 1'b1; end   // F8: LSE (libjpeg 9)
+            8'hDD: if (CHECKS && {len[15:8], in_data} != 16'd4) begin                   // Lr = 4 (B.2.4.4)
+                     err_set[ERR_SYNC] <= 1'b1; state <= nopay ? S_MK_FF : S_SKIP;
+                   end else state <= nopay ? S_MK_FF : S_DRI_HI;
+            8'hDA: if (nopay) begin state <= S_MK_FF; if (CHECKS) err_set[ERR_SCAN] <= 1'b1; end
+                   else state <= S_SOS_NS;
+            default: if (nopay) begin state <= S_MK_FF; if (CHECKS && !len2) err_set[ERR_SYNC] <= 1'b1; end
+                     else state <= S_SKIP;
           endcase
         end
         S_SKIP: if (consume) begin
           rem <= rem - 16'd1;
           if (rem == 16'd3) state <= S_MK_FF;
-          if (ai != 4'd15) ai <= ai + 4'd1;
-          if (ai <= 4'd4 && in_data != app_id) am <= 1'b0;
-          if (mk == 8'hE0 && ai == 4'd13 && am) saw_jfif <= 1'b1;            // JFIF: 14 data bytes at least
-          if (mk == 8'hEE && ai == 4'd11 && am) begin saw_adobe <= 1'b1; adobe_t0 <= (in_data == 8'd0); end
+          if (k != 7'd15) k <= k + 7'd1;
+          if (k <= 7'd4 && in_data != app_id) am <= 1'b0;
+          if (mk == 8'hE0 && k == 7'd13 && am) saw_jfif <= 1'b1;             // JFIF: 14 data bytes at least
+          if (mk == 8'hEE && k == 7'd11 && am) adobe0 <= (in_data == 8'd0);   // the last Adobe APP14 counts
         end
         // ---- DQT (B.2.4.1): PqTq, 64 x Qk (zig-zag order); several tables may follow
         S_DQT_PQTQ: if (consume) begin
