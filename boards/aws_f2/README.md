@@ -6,11 +6,11 @@ job engine), simulated with Verilator: the host's view (registers) and the lanes
 
 | file | what it is |
 |---|---|
-| `mem_lane.sv` | one decoder lane that works from memory: a job (file address and length, output area) is read with an AXI4 read master, decoded by the wide core (`jpeg_decoder FAST=2`, RGB) and written as 16-byte records {x, y, 4 x RGB} with an AXI4 write master (256- or 512-bit data); reports clocks, input / output waits, pixels, records, error bits and a hash that binds each colour to its position. Jobs run back to back without a reset; a job's inputs are sampled at its start; the lane stops reading at the frame's end and says done only when no burst is in flight; a job can be aborted (a file without an SOI never ends a frame) |
+| `mem_lane.sv` | one decoder lane that works from memory: a job (file address and length, output area) is read with an AXI4 read master, decoded by the wide core (`jpeg_decoder FAST=2`, RGB) and written as 16-byte records {x, y, 4 x RGB} with an AXI4 write master (256- or 512-bit data); reports clocks, input / output waits, pixels, records, error bits and a hash that binds each colour to its position. Jobs run back to back without a reset; a job's inputs are sampled at its start; the lane stops reading at the frame's end and says done only when no burst is in flight; a job can be aborted (a file that ends at or before its SOI never ends a frame) |
 | `f2_regs.sv` | the register file on an AXI-Lite slave (on F2: the shell's OCL port): per lane the next job, a tag, start / abort, status, results, and the engine clock at start and at done; globally an ID, the lane count, a free-running 64-bit clock, DONE / BUSY masks. Map in the file's header |
 | `jpeg_f2_engine.sv` | `f2_regs` plus NL lanes, each with its own AXI4 master port (on F2: one HBM channel per lane) |
 | `sim/tb_mem_lane.cpp` | one lane, a list of jobs back to back, against an AXI4 memory model with random delays and gaps on every channel: every pixel placed by x and y and compared with the golden image, the hash recomputed; the job inputs change and a start is pulsed while a job runs; at done nothing may be outstanding on the memory side |
-| `sim/run_lane_tests.py` | the job list: every corpus file (the 2 unsupported ones must end with ERR_SOF_TYPE and no pixels), the 50 malformed cases (bits and pixels as `tb/malformed/cases.json`), files with zeros after their EOI, a file without an SOI and three mid-frame aborts, an output area too small (res_ovf) - each special job followed by a clean file; 256- and 512-bit data, with 0, 30 (two seeds) and 60 % gaps |
+| `sim/run_lane_tests.py` | the job list: every corpus file (the 2 unsupported ones must end with ERR_SOF_TYPE and no pixels), the 50 malformed cases (bits and pixels as `tb/malformed/cases.json`), the 230 cut files of `tb/run_trunc_tests.py` (ERR_TRUNC; a 1-2 byte cut never starts a frame and is aborted), files with zeros after their EOI, a file without an SOI and three mid-frame aborts, an output area too small (res_ovf) - each special job followed by a clean file; 256- and 512-bit data, with 0, 30 (two seeds) and 60 % gaps |
 | `sim/tb_engine.cpp`, `sim/run_engine_tests.py` | the engine driven as the host would: files into memory first (on F2: PCIS writes), jobs by register (every access waits `--host-lat` clocks, a stand-in for a PCIe round trip), DONE polled, results and records read and checked as above; also the tags, the start counters, a start written while busy (ignored and counted), the ID / scratch / clock registers. Jobs in file order or largest first; reports the batch's wall clocks (engine clock, first start to last done) against the lower bound max(longest job, sum / NL) |
 
 ```sh
@@ -19,10 +19,10 @@ python3 run_lane_tests.py [--photos ../../../test_images/adapter.jpg ...]
 python3 run_engine_tests.py [--photos ...]
 ```
 
-Results (2026-10-10): lane 1,246/1,246 jobs (155 per list x 2 widths x 4 gap settings, and 3 photos at
-both widths with 30 % gaps: identical to libjpeg 9e, the decoder never waited for the writer); engine
-620/620 jobs in 4 batches (4 x 512 and 3 x 256 bits, both orders, with and without gaps) with every check
-passed. The 24 photo files (the 12 photos and their 4:2:0 copies) as one batch on 4 lanes of 512 bits, all
+Results (2026-10-10): lane 4,920/4,920 jobs (615 per list - with the 230 cut files of
+`tb/run_trunc_tests.py` - x 2 widths x 4 gap settings) and 3 photos at both widths with 30 % gaps
+(identical to libjpeg 9e, the decoder never waited for the writer); engine 2,460/2,460 jobs in 4 batches
+(4 x 512 and 3 x 256 bits, both orders, with and without gaps) with every check passed. The 24 photo files (the 12 photos and their 4:2:0 copies) as one batch on 4 lanes of 512 bits, all
 identical to libjpeg 9e: 29.79 M engine clocks from the first start to the last done in file order, 29.04 M
 largest file first, against a lower bound of 28.68 M (the lanes' work divided by 4): 1.039 and 1.013 times
 the bound, lanes busy 96 and 99 %, with a memory of unlimited bandwidth (40-80 clocks of read latency,

@@ -24,7 +24,7 @@ document corrected):
 
 | priority | work | state |
 |---|---|---|
-| 1 | completion, validation, unsupported colour | **done**: frames end at the image's EOI (ERR_TRUNC without one, ERR_SCAN for a second scan); segment lengths, the 4-byte DRI, distinct component ids, the AC symbol domain; RGB-coded files by libjpeg 9e's rule passed through (RGB output only), libjpeg 9's other colour spaces ERR_SOF_TYPE. Regression 1,926 + 234 + 900 runs (37 corpus files, 50 malformed); the review's own probes as expected in all four of its configurations; the SystemVerilog testbench 3,060 / 3,060 on Verilator; the wide core on the 24 photo files with the clocks of 2026-10-04. EP2C5: all ten builds re-fitted with CHECKS=1 (`fpga_raster` 4,587 of 4,608 LEs; `fpga_jtag` 4,481 at 95 MHz) and the board run on `fpga_jtag` 20 / 20 (FAST_STATUS 7f) |
+| 1 | completion, validation, unsupported colour | **done**: frames end at the image's EOI (ERR_TRUNC without one, ERR_SCAN for a second scan); segment lengths, the 4-byte DRI, distinct component ids, the AC symbol domain; RGB-coded files by libjpeg 9e's rule passed through (RGB output only), libjpeg 9's other colour spaces ERR_SOF_TYPE. Regression 1,926 + 234 + 900 runs (37 corpus files, 50 malformed); the review's own probes as expected in all four of its configurations; systematic truncation (`tb/run_trunc_tests.py`: 230 cut files, each followed by a valid image without reset) 4,140 / 4,140; the SystemVerilog testbench 3,060 / 3,060 on Verilator; the wide core on the 24 photo files with the clocks of 2026-10-04. EP2C5: all ten builds re-fitted with CHECKS=1 (`fpga_raster` 4,587 of 4,608 LEs; `fpga_jtag` 4,481 at 95 MHz) and the board run on `fpga_jtag` 20 / 20 (FAST_STATUS 7f) |
 | - | board checksum (a sum of position and colour terms: colours exchanged between positions go unseen) | described where board results are cited; new harnesses use a position-binding hash and read whole images back |
 | 2 | freeze profiles, reproducible builds | results name their source commits (acorn README); `scripts/manifest.py` records the commit, tool versions, sha256 of every source and test input, and per EP2C5 build its files, parameters, fit and timing summaries and bitstream hash (`bench/manifest_2026-10-10.json` for tonight's builds and board run) |
 | 3 | one FAST=2 decoder with real memory input and RGB output, full readback, wall time | the vendor-neutral part of the F2 harness is built and simulated (`boards/aws_f2`: memory lanes and job engine, full readback and position-binding hash, the engine's own wall clock); the F2-specific part needs AWS (Task B) |
@@ -168,9 +168,9 @@ Owner: "In parallel (pun intended) lets find a way around Huffman loop limitatio
     hash; jobs back to back, abort, done only with nothing in flight; 256- or 512-bit data.
     `f2_regs.sv` + `jpeg_f2_engine.sv`: NL lanes, each with its own AXI4 port (one HBM channel each), and
     the host's registers on AXI-Lite (OCL): job, tag, start / abort, status, results, engine clock at
-    start and done. Tests against an AXI4 memory model with random gaps on every channel: lane 1,240 /
-    1,240 jobs (corpus, the 50 malformed cases, data after the EOI, no SOI, mid-frame aborts, output
-    overflow; two widths, four gap settings), engine 620 / 620 jobs in four batches as a host would run
-    them; the 24 photo files as one batch on 4 lanes, all identical to libjpeg 9e, in 1.013 (largest
+    start and done. Tests against an AXI4 memory model with random gaps on every channel: lane 4,920 /
+    4,920 jobs (corpus, the 50 malformed cases, 230 truncations, data after the EOI, no SOI, mid-frame
+    aborts, output overflow; two widths, four gap settings), engine 2,460 / 2,460 jobs in four batches as
+    a host would run them; the 24 photo files as one batch on 4 lanes, all identical to libjpeg 9e, in 1.013 (largest
     first) to 1.039 (file order) times the lower bound of the engine clock (memory bandwidth not modelled). Option 2 would replace the lanes' read side only; the registers stay. Not built: the shell,
     HBM and clocking, the host program (on AWS's build image, after the owner's choice).

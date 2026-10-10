@@ -318,6 +318,12 @@ Both regressions compare against the reference images in `tb/golden/` (made by t
   the baseline domain, libjpeg 9 colour transforms) x 9 configurations x 2 stall settings =
   **900 runs**: each must end with `frame_done`, the expected error bit and, for header
   errors, no pixels.
+- **Systematic truncation** (`tb/run_trunc_tests.py`, 2026-10-10): three corpus files (restart
+  intervals, an EXIF thumbnail, grey) cut at 230 points - every segment boundary, after each marker
+  and length field, mid-payload, around the scan's restart markers, before and inside the EOI - each
+  followed by a valid image in the same decoder without a reset, x 9 configurations x 2 stall settings =
+  **4,140 runs**: a cut file of 3 bytes or more ends with its own frame and ERR_TRUNC, a 1-2 byte cut
+  (no frame header) starts no frame, the next image is exact, nothing hangs.
 - **Colour converter**: exhaustive over all 2^24 (Y,Cb,Cr) inputs for both constant sets.
 - **On hardware**: on the EP2C5 every test photo decodes with libjpeg's checksum and exactly the
   simulated clock count (`boards/ep2c5/fpga_jtag`; re-run 2026-10-10 with the review fixes: the 12 photos

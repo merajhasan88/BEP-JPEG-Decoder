@@ -4,7 +4,8 @@
   corpus     every tb/corpus file: supported ones identical to the regression's golden images (libjpeg 9e
              profile, tb/golden/<name>.box.rgb.pnm), the UNSUPPORTED ones with ERR_SOF_TYPE and no pixels
   special    each followed by a clean corpus file (a job's leftovers would show up in the next one):
-             the 50 tb/malformed cases (expected bits and pixels from cases.json); files with zeros after
+             the 50 tb/malformed cases (expected bits and pixels from cases.json); the 230 cut files of
+             tb/run_trunc_tests.py (ERR_TRUNC; a 1-2 byte cut never starts a frame: aborted); files with zeros after
              their EOI (the lane stops reading at the frame's end); a file without an SOI (never ends a
              frame: aborted); a large file aborted in mid-frame at three points; a file with too little
              room for its records (res_ovf)
@@ -35,6 +36,16 @@ def special_jobs():
         jobs.append(f"{os.path.join(REPO, 'tb', 'malformed', name + '.jpg')} - {'err' if c['pixels'] else 'errnp'}:{c['err']:x} 0")
     corpus = lambda b: os.path.join(REPO, "tb", "corpus", b + ".jpg")
     gold = lambda b: os.path.join(REPO, "tb", "golden", b + ".box.rgb.pnm")
+    sys.path.insert(0, os.path.join(REPO, "tb"))     # the cut files of tb/run_trunc_tests.py: ERR_TRUNC, or
+    import run_trunc_tests as RT                        # no frame at all for a 1-2 byte cut (aborted)
+    for b in RT.BASES:
+        d = open(os.path.join(REPO, "tb", "corpus", b + ".jpg"), "rb").read()
+        for p in RT.cuts(d):
+            f = os.path.join(RT.OUT, f"{b}_{p}.jpg")
+            if not os.path.exists(f):
+                os.makedirs(RT.OUT, exist_ok=True)
+                with open(f, "wb") as fh: fh.write(d[:p])
+            jobs.append(f"{f} - {'abort:20000' if p <= 2 else 'err:%x' % RT.ERR_TRUNC} 0")
     for b, pad in (("adp_16x16_q25_420", 5000), ("adp_45x37_q30_420_rst2", 1), ("adp_320x240_q90_420", 70000)):
         jobs.append(f"{corpus(b)} {gold(b)} ok {pad}")         # zeros after the EOI: not read, no effect
     os.makedirs(OUT, exist_ok=True)

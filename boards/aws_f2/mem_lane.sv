@@ -19,7 +19,7 @@
 // job may be written while one runs. The frame ends at the file's EOI (or, for a truncated file, at
 // its last byte); the bytes after it are not read. done comes when every burst in flight is complete
 // (read data in, write responses back), so a job's late read data can never reach the next job. A file
-// without an SOI never ends a frame (jpeg_parser: in_last before an SOI has no effect): the host aborts
+// that ends at or before its SOI never ends a frame (jpeg_parser: in_last there has no effect): the host aborts
 // such a job (job_abort: no new requests, the bursts in flight complete, then done with res_abort; the
 // records of an aborted job are incomplete).
 module mem_lane #(
