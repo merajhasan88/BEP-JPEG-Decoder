@@ -2,7 +2,9 @@
 #   make              -> all configurations (obj_mcu, obj_rbox, obj_rfancy, obj_ep2c5)
 #   make test         -> regression: every configuration x output format x corpus image, with and
 #                        without random stalls, against model/jpeg_golden.py (run_tests.py), then
-#                        several images streamed back to back without reset (run_stream_tests.py)
+#                        several images streamed back to back without reset (run_stream_tests.py),
+#                        malformed files (run_malformed_tests.py) and files cut at 230 points, each
+#                        followed by a valid image (run_trunc_tests.py)
 #   The corpus is tb/corpus (generated from test_images/adapter.jpg by ../scripts/make_corpus.py).
 #   make lint
 #   make decode       -> decode ../test_images/*.jpg with the C++ harness into ../out/
@@ -88,6 +90,7 @@ test: $(BINS) $(MULTI)
 	python3 run_tests.py
 	python3 run_stream_tests.py
 	python3 run_malformed_tests.py
+	python3 run_trunc_tests.py
 
 clean:
 	rm -rf obj_* out build *.log
