@@ -33,7 +33,7 @@ MCU order).
 
 | measured on a board | core | clock | resources | 12-megapixel photo |
 |---|---|---:|---|---:|
-| Intel/Altera Cyclone II EP2C5T144C8 (2004, 4,608 LEs) | `FAST=1` | 95 MHz | 4,481 LEs (97 %), 26/26 multipliers | 202-284 ms |
+| Intel/Altera Cyclone II EP2C5T144C8 (2004, 4,608 LEs) | `FAST=1` | 95 MHz | 4,470 LEs (97 %), 26/26 multipliers | 202-284 ms |
 | Xilinx Artix-7 XC7A200T (Acorn CLE-215+, remote board at fpgas.online) | `FAST=1` | 150 MHz | 2,488 LUTs, 17 DSP48E1, 7.5 BRAM | 87-154 ms |
 | the same Artix-7 board | `FAST=2` | 150 MHz | 6,211 LUTs, 33 DSP48E1, 9 BRAM | **22-49 ms** |
 | the same board, 15 decoders at once | 15 x `FAST=2` | 150 MHz (-3 grade) | 91,949 LUTs, 495 DSP48E1, 135 BRAM | **15 photos in 40 ms** (adapter.jpg) |
@@ -133,9 +133,9 @@ Options of `decode.sh` and `decode.py`:
 
   | `--core` | core | `FAST` | pixels per clock | `--profile` | size (measured builds) |
   |---|---|---|---|---|---|
-  | `single` (default) | pipelined (fast) core | 1 | at most 1; 1.0-2.4 clocks per pixel | `libjpeg`, `pillow` | 4,410-4,481 LEs on the Cyclone II EP2C5 |
+  | `single` (default) | pipelined (fast) core | 1 | at most 1; 1.0-2.4 clocks per pixel | `libjpeg`, `pillow` | 4,372-4,470 LEs on the Cyclone II EP2C5 |
   | `wide` | wide core | 2 | at most 4; 0.25-0.56 clocks per pixel on phone photos | `libjpeg` (MCU order only) | ~5,800 LUTs and 33 DSPs on an Artix-7; too big for the EP2C5 |
-  | `small` | compact core | 0 (the RTL default) | ~13.6 clocks per pixel | `libjpeg`, `pillow` | 3,469-4,587 LEs on the EP2C5 |
+  | `small` | compact core | 0 (the RTL default) | ~13.6 clocks per pixel | `libjpeg`, `pillow` | 3,460-4,566 LEs on the EP2C5 |
 
   The test scripts (`tb/run_tests.py --configs`, `tb/sim.sh -c`) name their builds after the core:
   `fmcu`, `frbox`, `frfancy` = single; `wmcu` = wide; `mcu`, `rbox`, `rfancy`, `ep2c5`, `noyrgb` = small.
@@ -251,9 +251,9 @@ that other tools ignore.
 
 | device, tool | build | logic | memory | multipliers | Fmax |
 |---|---|---:|---:|---:|---:|
-| Cyclone II EP2C5, Quartus 13.0sp1 | compact, MCU order (`boards/ep2c5/fpga`) | 3,469 LEs | 9 M4K | 26 9-bit | 59.7 MHz |
-| Cyclone II EP2C5, Quartus 13.0sp1 | compact, raster + Pillow smoothing + RGB (`fpga_raster`) | 4,587 LEs | 25 M4K | 26 9-bit | 60.5 MHz |
-| Cyclone II EP2C5, Quartus 13.0sp1 | fast, MCU order (`fpga_jtag`, board harness included) | 4,481 LEs | 59,712 bits | 26 9-bit | 99.2 MHz |
+| Cyclone II EP2C5, Quartus 13.0sp1 | compact, MCU order (`boards/ep2c5/fpga`) | 3,460 LEs | 9 M4K | 26 9-bit | 60.2 MHz |
+| Cyclone II EP2C5, Quartus 13.0sp1 | compact, raster + Pillow smoothing + RGB (`fpga_raster`) | 4,566 LEs | 25 M4K | 26 9-bit | 58.8 MHz |
+| Cyclone II EP2C5, Quartus 13.0sp1 | fast, MCU order (`fpga_jtag`, board harness included) | 4,470 LEs | 59,712 bits | 26 9-bit | 98.6 MHz |
 | Artix-7 XC7A200T-2, Vivado 2026.1 | fast, MCU order, decoder alone (from the build below) | 2,204 LUTs, 2,124 FFs | 13 BRAM18 | 17 DSP48E1 | - |
 | Artix-7 XC7A200T-2, Vivado 2026.1 | fast, MCU order (`boards/acorn_cle215`, UART harness included) | 2,488 LUTs, 2,671 FFs | 7.5 BRAM36 | 17 DSP48E1 | 157-160 MHz |
 

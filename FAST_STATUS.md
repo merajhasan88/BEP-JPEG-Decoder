@@ -449,17 +449,21 @@ parser was made smaller with the same behaviour (c68ac30: six 7-bit id compares 
 ones, the APP0/APP14 byte index in `k`, one Adobe flag, one marker dispatch). Re-fit with
 `compile_all.sh` (Quartus 13.0sp1):
 
-| build | LEs 2026-10-04 | LEs 2026-10-10 | timing |
-|---|---:|---:|---|
-| fpga_raster | 4,547 | **4,587** (21 free) | met at 50 MHz, Fmax 60.5 |
-| fpga_jtag | 4,425 | **4,481** | met at 95 MHz, +0.448 ns, Fmax 99.2 |
-| fpga_fast_bench | 4,368 | 4,420 | met at 95 MHz, +0.547 ns, Fmax 100.2 |
-| fpga_fast | 4,296 | 4,433 | met, Fmax 74.3 |
-| gls_fast | 4,337 | 4,410 | met, Fmax 75.2 |
-| gls_raster | 4,537 | 4,573 | met, Fmax 59.8 |
-| fpga_raster_ycc | 4,454 | 4,358 | met, Fmax 58.0 |
-| fpga_raster_box | 4,089 | 4,132 | met, Fmax 62.8 |
-| fpga / gls | 3,374 / 3,375 | 3,469 / 3,454 | met, Fmax 59.7 / 57.3 |
+| build | LEs 2026-10-04 | LEs 2026-10-10 | LEs 2026-10-12 | timing 2026-10-12 |
+|---|---:|---:|---:|---|
+| fpga_raster | 4,547 | **4,587** (21 free) | **4,566** (42 free) | met at 50 MHz, Fmax 58.8 |
+| fpga_jtag | 4,425 | **4,481** | **4,470** | met at 95 MHz, +0.379 ns, Fmax 98.6 |
+| fpga_fast_bench | 4,368 | 4,420 | 4,401 | met at 95 MHz, +0.716 ns, Fmax 101.9 |
+| fpga_fast | 4,296 | 4,433 | 4,372 | met, Fmax 65.4 |
+| gls_fast | 4,337 | 4,410 | 4,389 | met, Fmax 71.4 |
+| gls_raster | 4,537 | 4,573 | 4,558 | met, Fmax 60.8 |
+| fpga_raster_ycc | 4,454 | 4,358 | 4,480 | met, Fmax 60.9 |
+| fpga_raster_box | 4,089 | 4,132 | 4,127 | met, Fmax 60.2 |
+| fpga / gls | 3,374 / 3,375 | 3,469 / 3,454 | 3,460 / 3,458 | met, Fmax 60.2 / 58.4 |
+
+2026-10-12: re-fit after the parser fix of 6efb52b (bytes before an SOI skipped without ERR_SYNC), which only
+removes two error assignments; `fpga_raster_ycc` still grew by 122 LEs - the fitter's packing, not the logic.
+The board runs below were made with the 2026-10-10 bitstreams.
 
 On the board (`fpga_jtag`, USB-Blaster, `bench/board_jtag_95mhz_2026-10-10.txt`): the 12 photos with
 the same clock counts and checksums as on 2026-10-04 (the fixes cost nothing on ordinary files); the new
