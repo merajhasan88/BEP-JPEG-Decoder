@@ -28,7 +28,10 @@
 // is an error for every marker (ERR_DQT / ERR_DHT / ERR_FRAME / ERR_SCAN by marker, else ERR_SYNC); SOF0
 // and SOS need their fields (length 2: ERR_FRAME / ERR_SCAN), DRI is exactly 4 bytes (B.2.4.4, else
 // ERR_SYNC); DQT, DHT, APPn and COM may be empty (length 2, as libjpeg).  The component identifiers
-// of a frame are distinct (B.2.2, else ERR_FRAME).
+// of a frame are distinct (B.2.2, else ERR_FRAME).  Bytes before an SOI (between images, or before the
+// first) belong to no image and are skipped without an error: err holds an image's errors from its
+// frame_done until the next SOI clears it (before 2026-10-12 such bytes set ERR_SYNC on the image before,
+// after its frame_done: found by tb/jpeg_checker.sv with data after the EOI).
 // Colour space (cs_rgb, libjpeg 9e's rule): RGB images are passed through without colour conversion;
 // libjpeg 9's big-gamut component IDs (BG_YCC 1,0x22,0x23; BG_RGB 'r','g','b') and its LSE colour
 // transform marker (0xFFF8) are not supported (ERR_SOF_TYPE).  Tables persist across images (B.5); redefining one invalidates it
@@ -278,8 +281,7 @@ module jpeg_parser #(
       case (state)
         // ---- SOI
         S_SOI_FF: if (consume) begin
-          if (in_data == 8'hFF) state <= S_SOI_D8;
-          else err_set[ERR_SYNC] <= 1'b1;
+          if (in_data == 8'hFF) state <= S_SOI_D8;                // other bytes: no image yet, skipped
         end
         S_SOI_D8: if (consume) begin
           // SOI: image-local state starts afresh (B.2.4.4: no restart interval until a DRI;
@@ -288,7 +290,7 @@ module jpeg_parser #(
             state <= S_MK_FF; soi <= 1'b1; ri <= '0; img_w <= '0; img_h <= '0; scanned <= 1'b0;
             saw_jfif <= 1'b0; adobe0 <= 1'b0;
           end
-          else if (in_data != 8'hFF) begin state <= S_SOI_FF; err_set[ERR_SYNC] <= 1'b1; end
+          else if (in_data != 8'hFF) state <= S_SOI_FF;
         end
         // ---- marker
         S_MK_FF: if (consume) begin

@@ -1,11 +1,11 @@
 #!/bin/sh
 # tb/run_tests.sh - the regression with the SystemVerilog testbench (tb_jpeg.sv): no Python, no
 # C++.  The same runs as `make test` (the C++ harness driven by Python):
-#   1. every test file x 8 build configurations x 3 output formats x {no stalls, 30 % random input
-#      stalls + output back-pressure} against the golden images (tb/expected.txt): 1,616 runs;
+#   1. every test file x 9 build configurations x 3 output formats x {no stalls, 30 % random input
+#      stalls + output back-pressure} against the golden images (tb/expected.txt): 1,926 runs;
 #      too-wide images must end with ERR_WIDTH and no pixels, unsupported files with an error;
-#   2. images back to back without a reset (tb/stream_scenarios.txt): 80 runs;
-#   3. malformed and truncated files (tb/malformed/cases.txt): 416 runs.
+#   2. images back to back without a reset (tb/stream_scenarios.txt): 252 runs;
+#   3. malformed and truncated files (tb/malformed/cases.txt): 900 runs.
 #   tb/run_tests.sh [-s verilator|xsim|icarus|questa] [--quick] [--configs a,b,...]
 # --quick: no stall runs.  Data files are written by export_expectations.py in the development tree.
 HERE=$(cd "$(dirname "$0")" && pwd)
@@ -64,7 +64,8 @@ for cfg in $CONFIGS; do
     files=""; golds=""; n=0
     for nm in $names; do
       n=$((n + 1))
-      case $nm in malformed/*) files="$files,$HERE/$nm.jpg";; *) files="$files,$HERE/corpus/$nm.jpg";; esac
+      case $nm in malformed/*) files="$files,$HERE/$nm.jpg";; trail_*) files="$files,$HERE/trail/$nm.jpg";;
+                  *) files="$files,$HERE/corpus/$nm.jpg";; esac
       g="$HERE/golden/$nm.$prof.$fmt.pnm"
       case $nm in *UNSUPPORTED*|malformed/*) golds="$golds,-";; *) [ -f "$g" ] && golds="$golds,$g" || golds="$golds,-";; esac
     done

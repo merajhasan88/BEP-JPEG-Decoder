@@ -27,11 +27,27 @@ SCENARIOS = [
     ("an illegal AC symbol, then a valid image", ["malformed/ac_symbol_10", "adp_32x32_q25_420"]),
     ("a libjpeg 9 colour transform (LSE), then a valid image", ["malformed/lse_colour_transform", "adp_32x32_q25_420"]),
     ("an RGB-coded image between two YCbCr images", ["adp_32x32_q25_420", "adp_32x24_q50_rgb", "adp_17x33_q40_420"]),
+    # 2026-10-12 (found by tb/jpeg_checker.sv): bytes after an EOI belong to no image - they once set ERR_SYNC on
+    # the finished frame
+    ("bytes after the EOI (a camera's trailer: zeros, FF fill, a stray FF D9, text) leave the frame's err alone",
+     ["trail_adp_32x32_q25_420", "adp_17x33_q40_420"]),
 ]
+# what trail_<image> appends to the corpus image: no SOI in it, and it ends with a lone FF (the next file's FF D8
+# follows it)
+TRAILER = (bytes(64) + b"\xFF\x00\xFF\xFF\xFF\xD9" + b"SEFH\x00\x00\x00\x01 trailer written after the EOI "
+           + bytes(range(1, 255, 3)) + b"\xFF")
 
 def path_of(name):
-    """the file of a scenario entry: tb/corpus/<name>.jpg, or tb/malformed/<name>.jpg for malformed/<name>"""
-    return os.path.join(HERE, name + ".jpg") if name.startswith("malformed/") else os.path.join(CORPUS, name + ".jpg")
+    """the file of a scenario entry: tb/corpus/<name>.jpg; tb/malformed/<name>.jpg for malformed/<name>;
+    tb/trail/<name>.jpg for trail_<image>: the corpus image followed by TRAILER (written here when it differs)"""
+    if name.startswith("malformed/"): return os.path.join(HERE, name + ".jpg")
+    if name.startswith("trail_"):
+        p = os.path.join(HERE, "trail", name + ".jpg")
+        data = open(os.path.join(CORPUS, name[len("trail_"):] + ".jpg"), "rb").read() + TRAILER
+        if not os.path.exists(p) or open(p, "rb").read() != data:
+            os.makedirs(os.path.dirname(p), exist_ok=True); open(p, "wb").write(data)
+        return p
+    return os.path.join(CORPUS, name + ".jpg")
 
 def golden(name, prof, fmt):
     """the model's output, or None: an unsupported or malformed file, or a format the model refuses for it

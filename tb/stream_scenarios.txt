@@ -12,3 +12,4 @@ malformed/dup_ci_sof_and_sos adp_32x32_q25_420|component ids repeated in SOF and
 malformed/ac_symbol_10 adp_32x32_q25_420|an illegal AC symbol, then a valid image
 malformed/lse_colour_transform adp_32x32_q25_420|a libjpeg 9 colour transform (LSE), then a valid image
 adp_32x32_q25_420 adp_32x24_q50_rgb adp_17x33_q40_420|an RGB-coded image between two YCbCr images
+trail_adp_32x32_q25_420 adp_17x33_q40_420|bytes after the EOI (a camera's trailer: zeros, FF fill, a stray FF D9, text) leave the frame's err alone

@@ -51,7 +51,7 @@ package jpeg_pkg;
   localparam int ERR_HUFF       = 7;  // no Huffman code matched within 16 bits (corrupt data)
   localparam int ERR_MARKER     = 8;  // bits requested past a marker, unexpected marker in scan,
                                       // or RSTn out of sequence / without a restart interval
-  localparam int ERR_SYNC       = 9;  // byte stream not starting with SOI or lost marker sync
+  localparam int ERR_SYNC       = 9;  // lost marker sync inside an image (bytes before an SOI are skipped)
   localparam int ERR_WIDTH      = 10; // raster mode: image too wide for the row buffer (no pixels are produced)
   localparam int ERR_FRAME      = 11; // SOF0 invalid (B.2.2): width or height 0 (DNL is not supported),
                                       // wrong length, repeated Ci, Tqi > 3, or no SOF before the SOS

@@ -72,7 +72,7 @@ core_jpeg and H. Ishihara's aq_djpeg (same harness, same board, same files):
 - **Three cores, one interface.** A compact core (3.4k LEs, ~13.6 clocks/pixel), a fast core
   (~1-2.4 clocks/pixel, fits the EP2C5) and a wide core (~6k LUTs, 0.25-0.56 clocks/pixel), chosen
   with one parameter.
-- **Verified in depth.** Two independent testbenches (C++ and SystemVerilog) run the same 3,060
+- **Verified in depth.** Two independent testbenches (C++ and SystemVerilog) run the same 3,078
   checks (bit-exact pixels, files back to back, malformed files); gate-level simulation of the
   placed design; Verilator and Vivado's simulator; hardware from two vendors.
 
@@ -198,8 +198,9 @@ raster order, so `px_sof`/`px_eol` map directly onto AXI4-Stream video `tuser`/`
 
 **Completion contract.** Every image that reaches its scan (SOS) produces exactly one
 `frame_start` and one `frame_done`, also when it is unusable. Read `err` at `frame_done`: it
-holds that image's errors (it is cleared when the next image's SOI is accepted; the input is held
-at that SOI until the previous frame is done). If `err` is not zero, discard the frame's pixels.
+holds that image's errors, unchanged until the next image's SOI is accepted, which clears it (the
+input is held at that SOI until the previous frame is done; bytes between images belong to none and
+are skipped without an error). If `err` is not zero, discard the frame's pixels.
 `frame_done` comes at the image's EOI: segments after the scan (a COM, for example) are consumed
 first, a file that ends without its EOI (`in_last`) ends with `ERR_TRUNC`, and a second scan after a
 decoded one is `ERR_SCAN` (since 2026-10-10; before, the frame could end with the last pixel, ahead
@@ -285,7 +286,7 @@ in a pass's inputs, so no file can overflow the IDCT's datapath.
 ## Verification
 
 ```sh
-tb/run_tests.sh                       # SystemVerilog testbench: 1,926 + 234 + 900 runs (-s xsim for Vivado's simulator)
+tb/run_tests.sh                       # SystemVerilog testbench: 1,926 + 252 + 900 runs (-s xsim for Vivado's simulator)
 cd tb && make && make test            # the same runs with the C++ harness, driven by Python
 python3 ../scripts/compare_refs.py corpus/*.jpg   # the model against Pillow / OpenCV / libjpeg-turbo
 ```
@@ -307,11 +308,12 @@ Both regressions compare against the reference images in `tb/golden/` (made by t
   the 2 unsupported files = **1,926 runs, all bit-exact, with no unexpected error bit**, with
   strict raster order and `sof`/`eol` checked and `ERR_WIDTH` raised exactly where predicted; every
   run also fails if `frame_done` comes before the image's EOI (or, without one, its last byte).
-- **Images back to back without reset** (`tb/run_stream_tests.py`): 13 scenarios = 234 runs, among
-  them malformed files each followed by a valid image (its own error, the next frame exact).
+- **Images back to back without reset** (`tb/run_stream_tests.py`): 14 scenarios = 252 runs, among
+  them malformed files each followed by a valid image (its own error, the next frame exact) and an image
+  with bytes after its EOI (a camera's trailer: its frame's `err` stays 0, the next image is exact).
 - **Two independent testbenches**: the C++ harness (`make test`) and the SystemVerilog testbench
-  (`tb/run_tests.sh`) run the same 3,060 checks (1,926 + 234 + 900) and both pass all of them on
-  Verilator (2026-10-10); on Vivado's
+  (`tb/run_tests.sh`) run the same 3,078 checks (1,926 + 252 + 900) and both pass all of them on
+  Verilator (2026-10-12); on Vivado's
   xsim the SystemVerilog testbench passed a 396-run subset of the compact and fast cores (MCU and
   raster output, smoothing, malformed files) and 264 runs of the wide and fast cores (2026-10-04), and
   on the RTL with the review's fixes all 510 runs of the wide, fast and compact cores in MCU order
