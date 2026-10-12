@@ -259,7 +259,8 @@ with decoding time separated from streaming time, compare other FPGA decoders on
   14.1 (-nosmooth), stb_image 14.3, OpenCV 16.1, FFmpeg (RGB) 20.0 ms - all faster than the EP2C5's
   30.0 ms; libjpeg-turbo is 3-6x faster than the EP2C5 on every image (phone photos 54-73 ms against
   203-284 ms).  Per clock the FPGA does ~10x more (1.0-2.25 clocks/pixel against 8-22 for
-  libjpeg-turbo with AVX2); energy per image ~15-28x lower (PowerPlay estimate against RAPL).  At the
+  libjpeg-turbo with AVX2); energy per image ~15-28x lower by an estimate whose two sides are not measured
+  the same way (PowerPlay vectorless against RAPL package energy; not a claim until matched).  At the
   power-saver clock (~1 GHz) libjpeg-turbo and the EP2C5 are close (CPU 3-47 % faster on 7 images,
   21 % slower on the 64x64).  `bench_powersaver.json` keeps the power-saver runs.  **The claim that
   the EP2C5 beats libjpeg-turbo is withdrawn**; on the EP2C5 this design is near its ceiling (97 % of

@@ -19,17 +19,20 @@
    (~1 GHz) libjpeg-turbo and the EP2C5 are close. The CPU is 7-47 % faster on six images and level
    (3 %) on the 320x240 image. It takes 21 % longer on the 64x64 image (see the last table of the
    results).
-3. **Energy per image is the FPGA's clear advantage.** donald.jpg costs ~4.4 mJ on the EP2C5
-   (PowerPlay estimate 147 mW x 30 ms). libjpeg-turbo uses 124 mJ of CPU package energy at full
-   clock and 65 mJ in the power-saver profile, so the FPGA uses 15-28x less. Both figures are
-   rough: the FPGA's is a vectorless estimate that includes I/O, and the CPU's is RAPL package
-   energy that includes background power.
+3. **Energy per image: an estimate, not a measured result.** By Quartus PowerPlay's vectorless
+   estimate donald.jpg costs ~4.4 mJ on the EP2C5 (147 mW x 30 ms, the board's I/O included).
+   libjpeg-turbo's CPU package energy (RAPL) is 124 mJ at full clock and 65 mJ in the power-saver
+   profile, with background package power included and memory excluded. The ratio, 15-28x, suggests
+   the FPGA needs far less energy per image, but the two figures do not share a measurement boundary
+   (the review of 2026-10-10): a claim needs both sides measured the same way, for example at each
+   board's supply over the same work.
 4. **Correction.** Earlier versions of this file, README.md and the project notes said the EP2C5
    at 95 MHz decodes donald.jpg faster than libjpeg-turbo, FFmpeg and Pillow on one laptop core
    (30.0 ms against 32.8-42.6 ms). Those CPU numbers were measured with the laptop in its
    power-saver profile (~0.8-1 GHz), and so was the first run on 2026-09-30. FFmpeg was also
    measured without its RGB conversion. **That claim is withdrawn.** At full clock the laptop is
-   3-6x faster. What still holds is the per-clock and energy comparison above.
+   3-6x faster. What still holds is the per-clock comparison above (and the energy estimate, with
+   its caveat).
 5. **The decode time is the decoder alone.** On this board the file arrives over JTAG at ~35 KB/s
    (170 s for a 5.9 MB photo), and the pixels are checked on the chip. To keep up with the
    decoder, a system needs an input path of ~8 MB/s (donald.jpg) to ~21 MB/s (the dense phone
