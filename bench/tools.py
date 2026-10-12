@@ -113,8 +113,17 @@ def meta(images, core, prof, method=None):
     except OSError: pass
     try:
         import PIL, cv2, numpy
+        from PIL import features
         vers.update(Pillow=PIL.__version__, OpenCV=cv2.__version__, numpy=numpy.__version__)
+        # the JPEG library each one decodes with: Pillow's wheels bundle their own libjpeg-turbo
+        vers["Pillow libjpeg-turbo"] = features.version_feature("libjpeg_turbo")
+        vers["OpenCV JPEG"] = next((l.split(":", 1)[1].strip() for l in cv2.getBuildInformation().splitlines()
+                                    if l.strip().startswith("JPEG:")), None)
     except ImportError: pass
+    try:
+        lock = open(os.path.join(HERE, "bench_zune", "Cargo.lock")).read()
+        i = lock.index('name = "zune-jpeg"'); vers["zune-jpeg"] = lock[i:].split('version = "', 1)[1].split('"', 1)[0]
+    except (OSError, ValueError, IndexError): pass
     cpu = f"/sys/devices/system/cpu/cpu{str(core).split(',')[0].split('-')[0]}/cpufreq"
     sha = lambda p: hashlib.sha256(open(p, "rb").read()).hexdigest()
     return dict(date=time.strftime("%Y-%m-%d %H:%M:%S"), versions=vers, core=core, affinity=f"taskset -c {core}",

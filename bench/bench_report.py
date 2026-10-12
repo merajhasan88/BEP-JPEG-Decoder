@@ -3,9 +3,12 @@
 project's clock counts).  Board-measured clock counts (board_jtag_95mhz.txt, from
 boards/ep2c5/scripts/jtag_decode.py on the EP2C5) are marked where they exist.  With a second results file
 from the laptop in another power profile (bench_powersaver.json), a table compares the two.
-usage: bench_report.py bench.json [bench_powersaver.json] > tables.md"""
+usage: bench_report.py bench.json [bench_powersaver.json] [--compare-only] > tables.md
+--compare-only: only the power-profile comparison (the two runs must have measured the same images)"""
 import os, re, sys, json
 HERE = os.path.dirname(os.path.abspath(__file__))
+compare_only = "--compare-only" in sys.argv
+if compare_only: sys.argv.remove("--compare-only")
 res = json.load(open(sys.argv[1]))
 # this project's EP2C5 builds: (where, clock MHz, PowerPlay estimate in mW - vectorless, low confidence)
 FPGA = {
@@ -20,12 +23,24 @@ if os.path.exists(bf):
         if m: board[m[1]] = int(m[2])
 BOARD_NAME = {"adp_64x64_q25_420": "adp_64x64_q25_420", "scr_320x240_q90_420": "scr_320x240_q90_420",
               "donald_2048x1365": "donald", "portrait_1944x2592_444": "unnamed", "adapter_3120x4160_422": "adapter",
+              "adapter": "adapter",
               "phone_4000x3000_light": "IMG_20260912_012049", "phone_4000x3000_dense": "IMG_20260912_005827"}
-cpu_order = ["libjpeg-turbo (fancy)", "libjpeg-turbo (nosmooth)", "FFmpeg mjpeg", "Pillow", "OpenCV", "stb_image",
-             "libjpeg 9e (nosmooth)", "libjpeg 9e (fancy)", "Python reference model"]
-names = {"libjpeg-turbo (fancy)": "libjpeg-turbo 2.1.2, default (smoothing)", "libjpeg-turbo (nosmooth)": "libjpeg-turbo 2.1.2, -nosmooth",
-         "FFmpeg mjpeg": "FFmpeg 4.4.2 mjpeg decoder, RGB24 out", "Pillow": "Pillow 9.0.1 (libjpeg-turbo)", "OpenCV": "OpenCV 4.7 imdecode (libjpeg-turbo)",
-         "stb_image": "stb_image v2.27", "libjpeg 9e (nosmooth)": "libjpeg 9e, -nosmooth", "libjpeg 9e (fancy)": "libjpeg 9e, default",
+cpu_order = ["libjpeg-turbo (fancy)", "libjpeg-turbo (nosmooth)", "FFmpeg mjpeg", "zune-jpeg", "Pillow", "OpenCV", "stb_image",
+             "libjpeg 9e (nosmooth)", "libjpeg 9e (fancy)", "Go image/jpeg", "Python reference model"]
+# the labels name the versions the run recorded ("meta", runs since 2026-10-12), else those of the earlier runs
+V = res.get("meta", {}).get("versions", {})
+def ver(key, default):
+    m = re.search(r"(\d+(?:\.\d+)+)", V.get(key) or "")
+    return m[1] if m else default
+tv = ver("libjpeg-turbo", "2.1.2")
+pt = V.get("Pillow libjpeg-turbo")
+names = {"libjpeg-turbo (fancy)": f"libjpeg-turbo {tv}, default (smoothing)", "libjpeg-turbo (nosmooth)": f"libjpeg-turbo {tv}, -nosmooth",
+         "FFmpeg mjpeg": f"FFmpeg {ver('ffmpeg', '4.4.2')} mjpeg decoder, RGB24 out",
+         "zune-jpeg": f"zune-jpeg {V.get('zune-jpeg', '0.4.21')} (Rust)",
+         "Pillow": f"Pillow {V.get('Pillow', '9.0.1')} " + (f"(its own libjpeg-turbo {pt})" if pt else "(libjpeg-turbo)"),
+         "OpenCV": f"OpenCV {ver('OpenCV', '4.7')} imdecode (libjpeg-turbo {tv})",
+         "stb_image": f"stb_image v{ver('stb_image', '2.27')}", "libjpeg 9e (nosmooth)": "libjpeg 9e, -nosmooth",
+         "libjpeg 9e (fancy)": "libjpeg 9e, default", "Go image/jpeg": f"Go {ver('go', '1.27.1')} image/jpeg",
          "Python reference model": "model/jpeg_golden.py (pure Python)"}
 
 def fpga_rows(name, w, h):
@@ -36,7 +51,7 @@ def fpga_rows(name, w, h):
             yield label, where, mhz, mw, d["cycles"], "FAST" in label and board.get(BOARD_NAME.get(name, "")) == d["cycles"]
 
 prof = res.get("power_profile") or "unknown"
-for name, r in res["results"].items():
+for name, r in ([] if compare_only else res["results"].items()):
     any_r = next(v for v in r.values() if v)
     w, h = any_r["w"], any_r["h"]
     print(f"\n#### {name.replace('_', ' ')}: {w}x{h} ({w*h/1e6:.2f} Mpixel)\n")
@@ -58,11 +73,12 @@ for name, r in res["results"].items():
         mark = " \\*" if measured else ""
         print(f"| **this decoder**: {label}{mark} | {where} | {mhz:.0f} MHz | {t*1e3:.3f} | - | {w*h/t/1e6:.2f} | "
               f"{cyc/(w*h):.2f} | {mw*t:.1f} mJ (est.) |")
-print(f"\nCPU: power profile `{prof}`, clock = average measured by `perf stat` during each run (cycles / task time); "
-      "ms at 3.9 GHz = the run's cycles at a steady 3.9 GHz (the laptop's highest measured clock: the CPU's best case, "
-      "used in all comparisons with the FPGA); CPU clocks per pixel = time x that clock / pixels.  \\* this clock count was also measured on the EP2C5 board "
-      "(identical to the simulation), see `bench/board_jtag_95mhz.txt`.  FPGA energy: PowerPlay vectorless estimate x "
-      "decode time (low confidence).")
+if not compare_only:
+    print(f"\nCPU: power profile `{prof}`, clock = average measured by `perf stat` during each run (cycles / task time); "
+          "ms at 3.9 GHz = the run's cycles at a steady 3.9 GHz (the laptop's highest measured clock: the CPU's best case, "
+          "used in all comparisons with the FPGA); CPU clocks per pixel = time x that clock / pixels.  \\* this clock count was also measured on the EP2C5 board "
+          "(identical to the simulation), see `bench/board_jtag_95mhz.txt`.  FPGA energy: PowerPlay vectorless estimate x "
+          "decode time (low confidence).")
 
 if len(sys.argv) > 2 and os.path.exists(sys.argv[2]):
     ps = json.load(open(sys.argv[2]))

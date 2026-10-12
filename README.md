@@ -87,17 +87,18 @@ samples, a 4:2:0 pixel 1.5).
 **Against CPU decoders** (one laptop core, CPU times rescaled to a steady 3.9 GHz, the laptop's best
 case; [BENCHMARKS.md](BENCHMARKS.md)): libjpeg-turbo -nosmooth (the same pixels) decodes a single
 photo 2.2-3.2x faster than the `FAST=1` core at 150 MHz, but the `FAST=2` core at 150 MHz takes
-0.64-0.80x libjpeg-turbo's time and 0.64-0.88x that of the fastest CPU decoder on each photo, measured
-on the board. This is single-image time on one CPU core; a multi-core CPU decoding several photos at
+0.63-0.82x libjpeg-turbo's time and 0.64-0.82x that of the fastest CPU decoder on each photo, measured
+on the board (CPU decoders re-measured on 2026-10-12). This is single-image time on one CPU core; a multi-core CPU decoding several photos at
 once still has more throughput than one decoder. Fifteen wide decoders on the same board decoded at
 the same time with pixels identical to libjpeg 9e; from their clock counts (each lane's decode time
 with an ideal input: the gated clocks leave out the waits for the UART; a real system must feed all
 15 lanes at full speed, about 1.3 GB/s of JPEG in and 14.5 GB/s of RGB out for adapter-sized photos)
 that is 372 photos/s on adapter.jpg (4.83 Gpixel/s; the 15 lanes decoded copies of one file sent
-once), 20.7x one laptop core. On the 24 photo files the batch does 408 photos/s (a schedule of the
-24 single-file times on 15 lanes, longest first: 371.5 in file order, 470.8 with ideal balance), against 74.5 photos/s measured on the laptop's whole CPU (i7-8550U, 4 cores / 8 threads,
-libjpeg-turbo -nosmooth; it holds 2.35 GHz on all cores at its ~18 W limit): 5.5x the whole laptop
-CPU, and 3.3x even if every core held 3.9 GHz. Estimate only: about half of a 16-core CPU whose
+once), 20.3x one laptop core. On the 24 photo files the batch does 408 photos/s (a schedule of the
+24 single-file times on 15 lanes, longest first: 371.5 in file order, 470.8 with ideal balance), against 71.2 photos/s measured on the laptop's whole CPU (i7-8550U, 4 cores / 8 threads,
+libjpeg-turbo -nosmooth; the median of three runs, 68.4-72.3, on 2026-10-12 - one run on 2026-10-05
+gave 74.5; it holds about 2.3 GHz on all cores at 16-17 W): 5.7x the whole laptop CPU, and 3.4x even
+if every core held 3.9 GHz. Estimate only: about half of a 16-core CPU whose
 cores are each a hypothetical core 2.04x the laptop's (the libjpeg-turbo tjbench ratio of a Core Ultra 9 285K to the i7-8550U on OpenBenchmarking, 359 vs 176 Mpixel/s; not measured on these files). That build meets
 150 MHz for the board's -3 speed grade; on -2, the grade of the other rows, it reaches 141.5 MHz
 ([boards/acorn_cle215](boards/acorn_cle215/README.md)).

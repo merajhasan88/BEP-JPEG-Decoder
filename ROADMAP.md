@@ -57,8 +57,9 @@ Owner: "In parallel (pun intended) lets find a way around Huffman loop limitatio
   estimate 250-350 MHz on the fastest FPGAs.
 - **Target.** A hypothetical desktop core 2.04x as fast as the laptop's i7-8550U (the ratio of
   libjpeg-turbo's tjbench on OpenBenchmarking, Core Ultra 9 285K 359 vs 176 Mpixel/s - a different
-  benchmark, not measured on our files), so the wide core would need about 270 MHz to beat it on every photo (estimate; at 150 MHz it takes 1.31-1.80x
-  that core's time, against 0.64-0.88x of the laptop core's, measured).
+  benchmark, not measured on our files), so the wide core would need about 250 MHz to beat it on every photo (estimate; at 150 MHz it takes 1.31-1.67x
+  that core's time, against 0.64-0.82x of the laptop core's, measured; CPU re-measured on 2026-10-12 - with the run of
+  2026-10-04 it was 0.64-0.88x and about 270 MHz).
 - **Ideas to study:** decoding two or more codes per lookup; decoding speculatively at several bit
   positions and keeping the right result; together with Proposal A, letting independent pieces of a
   photo take turns in a loop with more pipeline stages.
@@ -69,7 +70,7 @@ Owner: "In parallel (pun intended) lets find a way around Huffman loop limitatio
   `results_batch_2026-10-05.json`), 91,949 LUTs and 495 DSPs, 150 MHz met for the board's -3 grade
   (141.5 MHz on -2). On the board: adapter.jpg broadcast to all 15 lanes, then three photos in three
   lanes - 18/18 identical to libjpeg 9e with every clock count equal to the simulation: 15 photos in
-  40.33 ms, 372 photos/s, 20.7x one laptop core. A 133 MHz build for the -2 grade was not completed (its routing was still resolving congestion
+  40.33 ms, 372 photos/s, 20.3x one laptop core (CPU re-measured on 2026-10-12; 20.7x against 2026-10-04). A 133 MHz build for the -2 grade was not completed (its routing was still resolving congestion
   after the 3-hour limit) and is not needed: the 150 MHz bitstream passed on the board.
 - **What.** Several wide decoders side by side on one FPGA, each decoding its own photo: throughput
   rather than single-photo time. Owner: "We do have to use that website for the batched mode that is

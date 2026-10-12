@@ -17,7 +17,7 @@ benchmark, not measured on these files).
 
 | design | clocks / pixel | vs laptop core (3.9 GHz) | vs hypothetical 2.04x core | needs |
 |---|---|---|---|---|
-| today's wide core (measured) | 0.255-0.561 | 0.64-0.88 | 1.30-1.79 | - |
+| today's wide core (measured) | 0.255-0.561 | 0.64-0.88 \* | 1.30-1.79 \* | - |
 | A, 2 segments | 0.19-0.54 | 0.59-0.77 | 1.20-1.57 | the whole file in memory, a resume mode, 2 cores |
 | **A, 4 segments** | 0.09-0.27 | **0.30-0.39** | **0.60-0.79** | ... 4 cores |
 | A, 4 segments, pass 1 at 2 symbols/clock | 0.08-0.22 | 0.24-0.31 | 0.48-0.63 | ... + a 2-symbol skimmer |
@@ -25,6 +25,12 @@ benchmark, not measured on these files).
 | B, 2 symbols per clock only | 0.25-0.41 | 0.49-0.87 | 0.99-1.78 | a multi-symbol Huffman decoder |
 | B, 2 symbols/clock, every stage widened (input 4 bytes, long codes 1 clock, IDCT x2, 8 pixels/beat) | 0.13-0.29 | 0.32-0.48 | 0.66-0.98 | a new "W8" core, ~2x the area |
 | B, 4 symbols/clock, every stage widened | 0.13-0.19 | 0.24-0.46 | 0.49-0.94 | ... larger still |
+
+\* Against the CPU run of 2026-10-04 (`bench/bench_photos_2026-10-04.json`, which `model/perf/perf_model.py` reads,
+so every estimate here stays reproducible). The CPU decoders were re-measured on 2026-10-12 with every batch and
+the run's metadata kept (`bench/bench_photos_2026-10-12.json`): today's wide core then takes 0.64-0.82x the fastest
+CPU decoder's time (1.31-1.67x the hypothetical core's). The A and B rows were not recomputed with it: they
+divide by the same per-photo CPU times, so they change by the same per-photo factors.
 
 (All rows except the first are estimates. A's rows include the measured synchronisation overlap.)
 Raw numbers: `model/perf/proposals_2026-10-04.json` (`model/perf/proposals.py`).

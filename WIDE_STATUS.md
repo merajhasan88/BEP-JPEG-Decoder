@@ -137,7 +137,9 @@ config; SV testbench: parameter derived from FAST); the Acorn harness folds `px_
   copies at 3.0-3.7 GHz). Like for like - every CPU time at a steady 3.9 GHz, libjpeg-turbo -nosmooth -
   the wide core at 150 MHz takes 0.64-0.77x libjpeg-turbo's time on the photos and 0.64-0.80x on the
   copies, and 0.64-0.88x the time of the fastest CPU decoder on each file (FFmpeg on three of them);
-  it matches libjpeg-turbo on every file from 120 MHz and the fastest CPU decoder from 131 MHz.
+  it matches libjpeg-turbo on every file from 120 MHz and the fastest CPU decoder from 131 MHz. (CPU decoders
+  re-measured on 2026-10-12, `bench/bench_photos_2026-10-12.json`: 0.63-0.82x libjpeg-turbo's time, 0.64-0.82x
+  the fastest CPU decoder's - libjpeg-turbo on every file - and every CPU decoder beaten from 123 MHz.)
   Board harness: DUT 3 = `jpeg_decoder #(.FAST(2))` in `boards/acorn_cle215/uart_bench_core.sv` (checksum
   of up to 4 pixels per beat in a 3-stage pipeline; the clock count stops at frame_done as for DUT 0);
   `build.tcl` reads `rtl/files.f`; `make_expected.py --duts 3` (clocks from tb/obj_wmcu). Harness simulation

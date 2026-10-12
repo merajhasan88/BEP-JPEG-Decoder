@@ -123,9 +123,9 @@ What the runs show:
 - **The wide core (`FAST=2`, DUT 3, run on 2026-10-04) decoded all 24 files with pixels identical to
   libjpeg 9e** at 0.295-0.561 clocks/pixel on the 4:2:2 originals and 0.255-0.417 on the 4:2:0 copies,
   3.0-4.0x fewer clocks than the fast core: 22.0-48.6 ms per 12-megapixel photo at 150 MHz. Every
-  clock count equals the cycle-exact simulation. That is 0.64-0.80x the time of libjpeg-turbo
-  -nosmooth on one laptop core at 3.9 GHz and 0.64-0.88x that of the fastest CPU decoder on each file
-  (`../../BENCHMARKS.md`). With the harness it needs 6,211 LUTs, 33 DSPs and 9 block-RAM tiles (the
+  clock count equals the cycle-exact simulation. That is 0.63-0.82x the time of libjpeg-turbo
+  -nosmooth on one laptop core at 3.9 GHz and 0.64-0.82x that of the fastest CPU decoder on each file
+  (CPU decoders re-measured on 2026-10-12; `../../BENCHMARKS.md`). With the harness it needs 6,211 LUTs, 33 DSPs and 9 block-RAM tiles (the
   decoder alone 5,827 LUTs, 6,831 flip-flops); 150 MHz is met with `VIVADO_EFFORT=high` (+0.013 ns).
   The 24 files ran on the build before two fixes found by Vivado's xsim (a missing reset of the IDCT
   pipeline's valid bits; a workaround for an xsim bug); the final bitstream was run on 3 of them
@@ -185,11 +185,12 @@ of `uart_bench_core.sv`, the lane number in byte 5) comes back as soon as it has
   0-2 (IMG20260716020409.jpg 3,825,225, IMG20260716020422_420.jpg 3,304,743,
   IMG20260716020424_420.jpg 3,305,261 clocks).
 - **Throughput** (from the measured counts): 15 adapter.jpg in 40.33 ms, 372 photos/s or 4.83
-  Gpixel/s, 20.7x one laptop core at a steady 3.9 GHz (libjpeg-turbo -nosmooth, the fastest CPU
-  decoder on this photo, 55.5 ms) and about 10x a hypothetical core 2.04x the laptop's (the libjpeg-turbo tjbench ratio of a Core Ultra 9 285K to the i7-8550U on OpenBenchmarking, 359 vs 176 Mpixel/s; not measured on these files). On the 24 photo files (each file's
+  Gpixel/s, 20.3x one laptop core at a steady 3.9 GHz (libjpeg-turbo -nosmooth, the fastest CPU
+  decoder on this photo, 54.6 ms on 2026-10-12) and about 10x a hypothetical core 2.04x the laptop's (the libjpeg-turbo tjbench ratio of a Core Ultra 9 285K to the i7-8550U on OpenBenchmarking, 359 vs 176 Mpixel/s; not measured on these files). On the 24 photo files (each file's
   measured count, spread over the 15 lanes, longest first) 408 photos/s (371.5 in file order, 470.8
-  with ideal balance), 5.5x the laptop's whole CPU measured on the same
-  files (74.5 photos/s on 4 cores / 8 threads at 2.35 GHz, its ~18 W limit; `../../bench/bench_multicore.py`).
+  with ideal balance), 5.7x the laptop's whole CPU measured on the same
+  files (71.2 photos/s on 4 cores / 8 threads, the median of three runs on 2026-10-12, at about 2.3 GHz and
+  16-17 W; one run on 2026-10-05 gave 74.5, 5.5x; `../../bench/bench_multicore.py`).
   A real system has to feed every lane at full speed (here the 1 Mbaud UART cannot; the lanes'
   clocks pause while they wait: the adapter.jpg upload took 35.7 s, its decode 40.33 ms): 372
   adapter-sized photos/s need about 1.3 GB/s of JPEG in and 14.5 GB/s of RGB out. The 15 lanes
