@@ -7,7 +7,13 @@ and **H. Ishihara's aq_djpeg** (MIT, via ultraembedded/legacy_jpeg_decoder; base
 subsamplings, restart markers). Others were excluded: forks of these two, a VHDL decoder built on
 Xilinx-licensed CoreGen modules (not usable on an Intel/Altera device), incomplete student
 designs, and HLS libraries for data-centre FPGAs. Their sources are fetched by
-`bench/others/fetch.sh` into `bench/others/third_party` (ignored by git) and are not part of this library.
+`bench/others/fetch.sh` into `bench/others/third_party` (ignored by git) and are not part of this library;
+the results hold for exactly these revisions and settings: core_jpeg at commit `bb03cce` (2020-10-26),
+legacy_jpeg_decoder at `de6832b` (2020-10-25), each built by `bench/others/quartus/make_projects.sh`
+(the same harness, device, optimisation settings and a 95 MHz clock constraint for all). This is not a
+survey of all FPGA JPEG IP: commercial cores (CAST's, for example) were not available to test, and their
+datasheet figures are not comparable measurements. A file a decoder does not support is listed as such,
+apart from slower or inexact decodes.
 
 Method: every decoder is wrapped in the same 4-pin harness (`bench/others/quartus/cmp_wrap.sv`:
 input word from a serial pin, every output pixel accepted at once and folded into a checksum on a
