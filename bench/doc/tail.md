@@ -44,7 +44,8 @@ power-saver comparison cite the runs of 2026-09-30 on the earlier image set (don
    (170 s for a 5.9 MB photo), and the pixels are checked on the chip. To keep up with the
    decoder, a system needs an input path of ~8 MB/s (donald.jpg) to ~21 MB/s (the dense phone
    photo). It also needs a consumer that takes 42-93 Mpixel/s in 8x8 / 16x16 tiles.
-6. **The compact core** (`FAST=0`, 3.4k LEs, 50 MHz) needs 12.8-21 clocks/pixel (0.75 s for
+6. **The compact core** (`FAST=0`, 3.4k LEs, 50 MHz) needs 16.1-18.8 clocks/pixel on the 12 photos (4.2-4.9 s each
+   at 50 MHz; simulation, 2026-10-13) and 12.8-21 on the earlier images (0.75 s for
    donald.jpg). Use it when area matters more than speed. It is also the core that fits the EP2C5
    with raster output and Pillow-exact smoothing (up to 352 pixels wide for 4:2:0).
 7. **Among the CPU decoders** at 3.9 GHz (on the 320x240 image and the 12 photos, 2026-10-12),

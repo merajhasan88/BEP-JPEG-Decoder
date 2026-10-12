@@ -3682,11 +3682,21 @@
     "cycles": 20908689,
     "pixels": 12979200,
     "err": "0000"
+   },
+   "MCU order, replication, RGB": {
+    "cycles": 234618649,
+    "pixels": 12979200,
+    "err": "0000"
    }
   },
   "IMG20260405182833": {
    "FAST, MCU order, replication, RGB": {
     "cycles": 21531453,
+    "pixels": 12979200,
+    "err": "0000"
+   },
+   "MCU order, replication, RGB": {
+    "cycles": 236422620,
     "pixels": 12979200,
     "err": "0000"
    }
@@ -3696,11 +3706,21 @@
     "cycles": 19143517,
     "pixels": 12979200,
     "err": "0000"
+   },
+   "MCU order, replication, RGB": {
+    "cycles": 228311345,
+    "pixels": 12979200,
+    "err": "0000"
    }
   },
   "IMG20260425135628": {
    "FAST, MCU order, replication, RGB": {
     "cycles": 23107669,
+    "pixels": 12979200,
+    "err": "0000"
+   },
+   "MCU order, replication, RGB": {
+    "cycles": 244252759,
     "pixels": 12979200,
     "err": "0000"
    }
@@ -3710,11 +3730,21 @@
     "cycles": 19061153,
     "pixels": 12979200,
     "err": "0000"
+   },
+   "MCU order, replication, RGB": {
+    "cycles": 230284527,
+    "pixels": 12979200,
+    "err": "0000"
    }
   },
   "IMG20260523191343": {
    "FAST, MCU order, replication, RGB": {
     "cycles": 20037777,
+    "pixels": 12979200,
+    "err": "0000"
+   },
+   "MCU order, replication, RGB": {
+    "cycles": 233684192,
     "pixels": 12979200,
     "err": "0000"
    }
@@ -3724,11 +3754,21 @@
     "cycles": 17004745,
     "pixels": 12979200,
     "err": "0000"
+   },
+   "MCU order, replication, RGB": {
+    "cycles": 221640844,
+    "pixels": 12979200,
+    "err": "0000"
    }
   },
   "IMG20260716020409": {
    "FAST, MCU order, replication, RGB": {
     "cycles": 15364517,
+    "pixels": 12979200,
+    "err": "0000"
+   },
+   "MCU order, replication, RGB": {
+    "cycles": 209095792,
     "pixels": 12979200,
     "err": "0000"
    }
@@ -3738,11 +3778,21 @@
     "cycles": 15411569,
     "pixels": 12979200,
     "err": "0000"
+   },
+   "MCU order, replication, RGB": {
+    "cycles": 209682142,
+    "pixels": 12979200,
+    "err": "0000"
    }
   },
   "IMG20260716020424": {
    "FAST, MCU order, replication, RGB": {
     "cycles": 15364489,
+    "pixels": 12979200,
+    "err": "0000"
+   },
+   "MCU order, replication, RGB": {
+    "cycles": 209248651,
     "pixels": 12979200,
     "err": "0000"
    }
@@ -3752,11 +3802,21 @@
     "cycles": 17368025,
     "pixels": 12979200,
     "err": "0000"
+   },
+   "MCU order, replication, RGB": {
+    "cycles": 220735363,
+    "pixels": 12979200,
+    "err": "0000"
    }
   },
   "adapter": {
    "FAST, MCU order, replication, RGB": {
     "cycles": 19234181,
+    "pixels": 12979200,
+    "err": "0000"
+   },
+   "MCU order, replication, RGB": {
+    "cycles": 231934798,
     "pixels": 12979200,
     "err": "0000"
    }

@@ -92,6 +92,7 @@ Not measured: the laptop's Intel UHD 620 hardware JPEG decoder and GPU decoders 
 | libjpeg 9e, default | i7-8550U, 1 thread | 3.83 GHz | 144.845 (143.354-150.877) | 142.394 | 89.6 | 42.8 | 2803.3 mJ |
 | Go 1.27.1 image/jpeg | i7-8550U, 1 thread | 3.81 GHz | 269.487 (264.117-270.273) | 263.268 | 48.2 | 79.1 | 4881.5 mJ |
 | **this decoder**: FAST, MCU order, replication, RGB | EP2C5, fast core (`boards/ep2c5/fpga_jtag`) | 95 MHz | 220.091 | - | 58.97 | 1.61 | 32.3 mJ (est.) |
+| **this decoder**: MCU order, replication, RGB | EP2C5, compact core (`boards/ep2c5/fpga`) | 50 MHz | 4692.373 | - | 2.77 | 18.08 | 330.3 mJ (est.) |
 
 #### IMG20260405182833: 3120x4160 (12.98 Mpixel)
 
@@ -108,6 +109,7 @@ Not measured: the laptop's Intel UHD 620 hardware JPEG decoder and GPU decoders 
 | libjpeg 9e, default | i7-8550U, 1 thread | 3.87 GHz | 149.598 (149.231-150.797) | 148.332 | 86.8 | 44.6 | 2537.0 mJ |
 | Go 1.27.1 image/jpeg | i7-8550U, 1 thread | 3.75 GHz | 280.454 (262.374-281.262) | 269.596 | 46.3 | 81.0 | 4673.7 mJ |
 | **this decoder**: FAST, MCU order, replication, RGB | EP2C5, fast core (`boards/ep2c5/fpga_jtag`) | 95 MHz | 226.647 | - | 57.27 | 1.66 | 33.3 mJ (est.) |
+| **this decoder**: MCU order, replication, RGB | EP2C5, compact core (`boards/ep2c5/fpga`) | 50 MHz | 4728.452 | - | 2.74 | 18.22 | 332.9 mJ (est.) |
 
 #### IMG20260425135544: 3120x4160 (12.98 Mpixel)
 
@@ -124,6 +126,7 @@ Not measured: the laptop's Intel UHD 620 hardware JPEG decoder and GPU decoders 
 | libjpeg 9e, default | i7-8550U, 1 thread | 3.31 GHz | 160.898 (153.871-170.237) | 136.639 | 80.7 | 41.1 | 2546.0 mJ |
 | Go 1.27.1 image/jpeg | i7-8550U, 1 thread | 3.75 GHz | 245.667 (244.586-246.204) | 236.408 | 52.8 | 71.0 | 3685.6 mJ |
 | **this decoder**: FAST, MCU order, replication, RGB | EP2C5, fast core (`boards/ep2c5/fpga_jtag`) | 95 MHz | 201.511 | - | 64.41 | 1.47 | 29.6 mJ (est.) |
+| **this decoder**: MCU order, replication, RGB | EP2C5, compact core (`boards/ep2c5/fpga`) | 50 MHz | 4566.227 | - | 2.84 | 17.59 | 321.5 mJ (est.) |
 
 #### IMG20260425135628: 4160x3120 (12.98 Mpixel)
 
@@ -140,6 +143,7 @@ Not measured: the laptop's Intel UHD 620 hardware JPEG decoder and GPU decoders 
 | libjpeg 9e, default | i7-8550U, 1 thread | 3.73 GHz | 157.751 (156.518-158.121) | 150.956 | 82.3 | 45.4 | 2361.3 mJ |
 | Go 1.27.1 image/jpeg | i7-8550U, 1 thread | 3.71 GHz | 286.721 (279.611-288.122) | 272.385 | 45.3 | 81.8 | 4404.3 mJ |
 | **this decoder**: FAST, MCU order, replication, RGB | EP2C5, fast core (`boards/ep2c5/fpga_jtag`) | 95 MHz | 243.239 | - | 53.36 | 1.78 | 35.7 mJ (est.) |
+| **this decoder**: MCU order, replication, RGB | EP2C5, compact core (`boards/ep2c5/fpga`) | 50 MHz | 4885.055 | - | 2.66 | 18.82 | 343.9 mJ (est.) |
 
 #### IMG20260425141210: 4160x3120 (12.98 Mpixel)
 
@@ -156,6 +160,7 @@ Not measured: the laptop's Intel UHD 620 hardware JPEG decoder and GPU decoders 
 | libjpeg 9e, default | i7-8550U, 1 thread | 3.75 GHz | 136.817 (136.407-136.984) | 131.450 | 94.9 | 39.5 | 2056.4 mJ |
 | Go 1.27.1 image/jpeg | i7-8550U, 1 thread | 3.65 GHz | 260.108 (258.505-260.626) | 243.301 | 49.9 | 73.1 | 3855.1 mJ |
 | **this decoder**: FAST, MCU order, replication, RGB | EP2C5, fast core (`boards/ep2c5/fpga_jtag`) | 95 MHz | 200.644 | - | 64.69 | 1.47 | 29.5 mJ (est.) |
+| **this decoder**: MCU order, replication, RGB | EP2C5, compact core (`boards/ep2c5/fpga`) | 50 MHz | 4605.691 | - | 2.82 | 17.74 | 324.2 mJ (est.) |
 
 #### IMG20260523191343: 3120x4160 (12.98 Mpixel)
 
@@ -172,6 +177,7 @@ Not measured: the laptop's Intel UHD 620 hardware JPEG decoder and GPU decoders 
 | libjpeg 9e, default | i7-8550U, 1 thread | 3.72 GHz | 144.089 (142.416-145.091) | 137.402 | 90.1 | 41.3 | 2209.1 mJ |
 | Go 1.27.1 image/jpeg | i7-8550U, 1 thread | 3.73 GHz | 264.332 (258.258-269.043) | 252.809 | 49.1 | 76.0 | 3934.2 mJ |
 | **this decoder**: FAST, MCU order, replication, RGB | EP2C5, fast core (`boards/ep2c5/fpga_jtag`) | 95 MHz | 210.924 | - | 61.53 | 1.54 | 31.0 mJ (est.) |
+| **this decoder**: MCU order, replication, RGB | EP2C5, compact core (`boards/ep2c5/fpga`) | 50 MHz | 4673.684 | - | 2.78 | 18.00 | 329.0 mJ (est.) |
 
 #### IMG20260612210949: 4160x3120 (12.98 Mpixel)
 
@@ -188,6 +194,7 @@ Not measured: the laptop's Intel UHD 620 hardware JPEG decoder and GPU decoders 
 | libjpeg 9e, default | i7-8550U, 1 thread | 3.78 GHz | 122.075 (121.675-122.287) | 118.225 | 106.3 | 35.5 | 1828.9 mJ |
 | Go 1.27.1 image/jpeg | i7-8550U, 1 thread | 3.77 GHz | 228.676 (226.982-228.840) | 220.995 | 56.8 | 66.4 | 3387.2 mJ |
 | **this decoder**: FAST, MCU order, replication, RGB | EP2C5, fast core (`boards/ep2c5/fpga_jtag`) | 95 MHz | 178.997 | - | 72.51 | 1.31 | 26.3 mJ (est.) |
+| **this decoder**: MCU order, replication, RGB | EP2C5, compact core (`boards/ep2c5/fpga`) | 50 MHz | 4432.817 | - | 2.93 | 17.08 | 312.1 mJ (est.) |
 
 #### IMG20260716020409: 4160x3120 (12.98 Mpixel)
 
@@ -204,6 +211,7 @@ Not measured: the laptop's Intel UHD 620 hardware JPEG decoder and GPU decoders 
 | libjpeg 9e, default | i7-8550U, 1 thread | 3.66 GHz | 108.746 (103.465-112.773) | 101.998 | 119.3 | 30.6 | 1672.1 mJ |
 | Go 1.27.1 image/jpeg | i7-8550U, 1 thread | 3.63 GHz | 214.833 (210.508-217.805) | 199.904 | 60.4 | 60.1 | 3215.6 mJ |
 | **this decoder**: FAST, MCU order, replication, RGB | EP2C5, fast core (`boards/ep2c5/fpga_jtag`) | 95 MHz | 161.732 | - | 80.25 | 1.18 | 23.7 mJ (est.) |
+| **this decoder**: MCU order, replication, RGB | EP2C5, compact core (`boards/ep2c5/fpga`) | 50 MHz | 4181.916 | - | 3.10 | 16.11 | 294.4 mJ (est.) |
 
 #### IMG20260716020422: 4160x3120 (12.98 Mpixel)
 
@@ -220,6 +228,7 @@ Not measured: the laptop's Intel UHD 620 hardware JPEG decoder and GPU decoders 
 | libjpeg 9e, default | i7-8550U, 1 thread | 3.67 GHz | 102.123 (101.480-102.693) | 96.205 | 127.1 | 28.9 | 1539.9 mJ |
 | Go 1.27.1 image/jpeg | i7-8550U, 1 thread | 3.69 GHz | 210.167 (207.094-210.641) | 199.119 | 61.8 | 59.8 | 3186.0 mJ |
 | **this decoder**: FAST, MCU order, replication, RGB | EP2C5, fast core (`boards/ep2c5/fpga_jtag`) | 95 MHz | 162.227 | - | 80.01 | 1.19 | 23.8 mJ (est.) |
+| **this decoder**: MCU order, replication, RGB | EP2C5, compact core (`boards/ep2c5/fpga`) | 50 MHz | 4193.643 | - | 3.09 | 16.16 | 295.2 mJ (est.) |
 
 #### IMG20260716020424: 4160x3120 (12.98 Mpixel)
 
@@ -236,6 +245,7 @@ Not measured: the laptop's Intel UHD 620 hardware JPEG decoder and GPU decoders 
 | libjpeg 9e, default | i7-8550U, 1 thread | 3.67 GHz | 101.437 (100.671-102.005) | 95.481 | 128.0 | 28.7 | 1528.9 mJ |
 | Go 1.27.1 image/jpeg | i7-8550U, 1 thread | 3.68 GHz | 207.947 (204.034-216.790) | 196.164 | 62.4 | 58.9 | 3143.4 mJ |
 | **this decoder**: FAST, MCU order, replication, RGB | EP2C5, fast core (`boards/ep2c5/fpga_jtag`) | 95 MHz | 161.731 | - | 80.25 | 1.18 | 23.7 mJ (est.) |
+| **this decoder**: MCU order, replication, RGB | EP2C5, compact core (`boards/ep2c5/fpga`) | 50 MHz | 4184.973 | - | 3.10 | 16.12 | 294.6 mJ (est.) |
 
 #### IMG20260723160735: 4160x3120 (12.98 Mpixel)
 
@@ -252,6 +262,7 @@ Not measured: the laptop's Intel UHD 620 hardware JPEG decoder and GPU decoders 
 | libjpeg 9e, default | i7-8550U, 1 thread | 3.71 GHz | 124.123 (119.944-124.290) | 118.013 | 104.6 | 35.5 | 1831.2 mJ |
 | Go 1.27.1 image/jpeg | i7-8550U, 1 thread | 3.73 GHz | 229.622 (227.614-233.286) | 219.848 | 56.5 | 66.1 | 3436.7 mJ |
 | **this decoder**: FAST, MCU order, replication, RGB | EP2C5, fast core (`boards/ep2c5/fpga_jtag`) | 95 MHz | 182.821 | - | 70.99 | 1.34 | 26.8 mJ (est.) |
+| **this decoder**: MCU order, replication, RGB | EP2C5, compact core (`boards/ep2c5/fpga`) | 50 MHz | 4414.707 | - | 2.94 | 17.01 | 310.8 mJ (est.) |
 
 #### adapter: 3120x4160 (12.98 Mpixel)
 
@@ -268,6 +279,7 @@ Not measured: the laptop's Intel UHD 620 hardware JPEG decoder and GPU decoders 
 | libjpeg 9e, default | i7-8550U, 1 thread | 3.76 GHz | 141.179 (141.015-141.406) | 136.075 | 91.9 | 40.9 | 2121.2 mJ |
 | Go 1.27.1 image/jpeg | i7-8550U, 1 thread | 3.76 GHz | 253.286 (251.737-254.916) | 244.258 | 51.2 | 73.4 | 3798.5 mJ |
 | **this decoder**: FAST, MCU order, replication, RGB \* | EP2C5, fast core (`boards/ep2c5/fpga_jtag`) | 95 MHz | 202.465 | - | 64.11 | 1.48 | 29.7 mJ (est.) |
+| **this decoder**: MCU order, replication, RGB | EP2C5, compact core (`boards/ep2c5/fpga`) | 50 MHz | 4638.696 | - | 2.80 | 17.87 | 326.6 mJ (est.) |
 
 CPU: power profile `performance`, clock = average measured by `perf stat` during each run (cycles / task time); ms at 3.9 GHz = the run's cycles at a steady 3.9 GHz (the laptop's highest measured clock: the CPU's best case, used in all comparisons with the FPGA); CPU clocks per pixel = time x that clock / pixels.  \* this clock count was also measured on the EP2C5 board (identical to the simulation), see `bench/board_jtag_95mhz.txt`.  FPGA energy: PowerPlay vectorless estimate x decode time (low confidence).
 
@@ -583,7 +595,8 @@ power-saver comparison cite the runs of 2026-09-30 on the earlier image set (don
    (170 s for a 5.9 MB photo), and the pixels are checked on the chip. To keep up with the
    decoder, a system needs an input path of ~8 MB/s (donald.jpg) to ~21 MB/s (the dense phone
    photo). It also needs a consumer that takes 42-93 Mpixel/s in 8x8 / 16x16 tiles.
-6. **The compact core** (`FAST=0`, 3.4k LEs, 50 MHz) needs 12.8-21 clocks/pixel (0.75 s for
+6. **The compact core** (`FAST=0`, 3.4k LEs, 50 MHz) needs 16.1-18.8 clocks/pixel on the 12 photos (4.2-4.9 s each
+   at 50 MHz; simulation, 2026-10-13) and 12.8-21 on the earlier images (0.75 s for
    donald.jpg). Use it when area matters more than speed. It is also the core that fits the EP2C5
    with raster output and Pillow-exact smoothing (up to 352 pixels wide for 4:2:0).
 7. **Among the CPU decoders** at 3.9 GHz (on the 320x240 image and the 12 photos, 2026-10-12),
