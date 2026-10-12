@@ -40,7 +40,9 @@ for name, r in res["results"].items():
     any_r = next(v for v in r.values() if v)
     w, h = any_r["w"], any_r["h"]
     print(f"\n#### {name.replace('_', ' ')}: {w}x{h} ({w*h/1e6:.2f} Mpixel)\n")
-    print("| decoder | where | clock | ms / image | ms at 3.9 GHz | Mpixel/s | clocks / pixel | energy / image |")
+    spread = any(v and "p10_ms" in v for v in r.values())          # runs since 2026-10-12 keep every batch
+    print("| decoder | where | clock | ms / image" + (" (median; p10-p90)" if spread else "")
+          + " | ms at 3.9 GHz | Mpixel/s | clocks / pixel | energy / image |")
     print("|---|---|---:|---:|---:|---:|---:|---:|")
     for k in cpu_order:
         v = r.get(k)
@@ -49,7 +51,8 @@ for name, r in res["results"].items():
         g = v.get("ghz")
         clk, cpp = (f"{g:.2f} GHz", f"{v['ms'] * g * 1e6 / (w * h):.1f}") if g else ("-", "-")
         at39 = f"{v['ms'] * g / 3.9:.3f}" if g else "-"
-        print(f"| {names[k]} | i7-8550U, 1 thread | {clk} | {v['ms']:.3f} | {at39} | {v['mpx_s']:.1f} | {cpp} | {e} |")
+        ms = f"{v['ms']:.3f}" + (f" ({v['p10_ms']:.3f}-{v['p90_ms']:.3f})" if "p10_ms" in v else "")
+        print(f"| {names[k]} | i7-8550U, 1 thread | {clk} | {ms} | {at39} | {v['mpx_s']:.1f} | {cpp} | {e} |")
     for label, where, mhz, mw, cyc, measured in fpga_rows(name, w, h):
         t = cyc / (mhz * 1e6)
         mark = " \\*" if measured else ""

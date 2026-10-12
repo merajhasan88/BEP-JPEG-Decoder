@@ -6,7 +6,7 @@ $BENCH_SCRATCH): libjpeg 9e (the IJG reference; this decoder's default profile m
   Go (bench_go):     go on PATH or the official release downloaded from go.dev
   zune-jpeg (Rust):  needs cargo (rustup; zune-jpeg 0.4.21 needs Rust 1.74 or later)
   python3 bench/tools.py      -> builds libjpeg 9e and prints the path of its djpeg"""
-import os, shutil, subprocess, tarfile, urllib.request
+import os, shutil, subprocess, tarfile, time, urllib.request
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.abspath(os.path.join(HERE, ".."))
@@ -92,6 +92,38 @@ def stb_image_dir():
     h = os.path.join(SCR, "stb_image.h")
     if not os.path.exists(h): urllib.request.urlretrieve(STB_URL, h)
     return SCR
+
+def meta(images, core, prof, method=None):
+    """what a benchmark run was made with (the review of 2026-10-10: CPU model, affinity, compiler and library
+    revisions, power settings, warm-up, distributions, exact input hashes)"""
+    import platform, hashlib
+    def first(cmd):
+        try: t = subprocess.run(cmd, capture_output=True, text=True); t = (t.stdout or t.stderr).strip()
+        except OSError: return None
+        return t.splitlines()[0] if t else None
+    def sysfs(f):
+        try: return open(f).read().strip()
+        except OSError: return None
+    vers = {"kernel": platform.release(), "python": platform.python_version(), "gcc": first(["gcc", "--version"]),
+            "libjpeg-turbo": first(["djpeg", "-version"]), "libjpeg 9e": "9e (bench/tools.py, built from ijg.org's jpegsrc.v9e)",
+            "ffmpeg": first(["ffmpeg", "-version"]), "go": first([go_bin(), "version"]), "rustc": first(["rustc", "--version"])}
+    try:
+        stb = open(os.path.join(stb_image_dir(), "stb_image.h")).readline().strip()
+        vers["stb_image"] = stb[:80]
+    except OSError: pass
+    try:
+        import PIL, cv2, numpy
+        vers.update(Pillow=PIL.__version__, OpenCV=cv2.__version__, numpy=numpy.__version__)
+    except ImportError: pass
+    cpu = f"/sys/devices/system/cpu/cpu{str(core).split(',')[0].split('-')[0]}/cpufreq"
+    sha = lambda p: hashlib.sha256(open(p, "rb").read()).hexdigest()
+    return dict(date=time.strftime("%Y-%m-%d %H:%M:%S"), versions=vers, core=core, affinity=f"taskset -c {core}",
+                power_profile=prof, governor=sysfs(f"{cpu}/scaling_governor"),
+                energy_performance_preference=sysfs(f"{cpu}/energy_performance_preference"),
+                method=method or "one warm-up decode, a 0.05 s calibration, then batches of ~0.1 s for at least the given time "
+                       "(1.5 s; at least 5, at most 64 batches); ms = the median batch's ms per decode, batches_ms = "
+                       "every batch in the order measured; ghz = the run's average clock by perf stat (cycles / task time)",
+                inputs={n: sha(p) for n, p in images})
 
 if __name__ == "__main__":
     print(djpeg9())

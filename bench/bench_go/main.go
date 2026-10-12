@@ -78,6 +78,7 @@ func main() {
 	}
 	e1 := rapl()
 	elapsed := time.Since(tstart).Seconds()
+	seq := append([]float64(nil), per...) // every batch in the order measured, for the spread
 	sort.Float64s(per)
 	med := per[len(per)/2]
 	uj := -1.0
@@ -86,4 +87,12 @@ func main() {
 	}
 	fmt.Printf("%dx%d ms=%.4f mpx_s=%.2f decodes=%d elapsed=%.2f uJ_per_decode=%.1f\n",
 		w, h, med*1e3, float64(w)*float64(h)/med/1e6, total, elapsed, uj)
+	fmt.Printf("per_batch=%d batches_ms=", perBatch)
+	for i, v := range seq {
+		if i > 0 {
+			fmt.Print(",")
+		}
+		fmt.Printf("%.4f", v*1e3)
+	}
+	fmt.Println()
 }
