@@ -1,0 +1,7 @@
+building wmcu (xsim) ...
+TEST FILES 107/107 passed
+STREAM TESTS 14/14 passed
+MALFORMED 50/50 passed
+ALL PASSED
+rc=0
+# 2026-10-13, tb/run_tests.sh -s xsim --quick --configs wmcu (Vivado 2026.1 xsim, no stall runs), RTL of 6efb52b, the interface checker (tb/jpeg_checker.sv) in every run

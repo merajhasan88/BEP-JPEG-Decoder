@@ -318,7 +318,9 @@ Both regressions compare against the reference images in `tb/golden/` (made by t
   xsim the SystemVerilog testbench passed a 396-run subset of the compact and fast cores (MCU and
   raster output, smoothing, malformed files) and 264 runs of the wide and fast cores (2026-10-04), and
   on the RTL with the review's fixes all 510 runs of the wide, fast and compact cores in MCU order
-  without stalls (321 + 39 + 150, 2026-10-10, `tb/regression_xsim_2026-10-10.txt`). xsim's stricter
+  without stalls (321 + 39 + 150, 2026-10-10, `tb/regression_xsim_2026-10-10.txt`), and with the interface
+  checker in every run and the parser's 2026-10-12 fix, the wide core's 171 runs without stalls (107 + 14 + 50,
+  2026-10-13, `tb/regression_xsim_2026-10-13.txt`). xsim's stricter
   4-state semantics found problems that Verilator, Quartus and the hardware never showed: a loop
   counter shared by several `always` blocks, a signal used in a port connection before its
   declaration, and unreset valid bits in the wide core's IDCT pipeline (all fixed); and an xsim bug
