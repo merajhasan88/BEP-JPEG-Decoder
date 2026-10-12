@@ -25,7 +25,7 @@ Every build option is verified **bit for bit** against a reference decoder:
 | default | libjpeg 9e `djpeg -dct int -nosmooth` |
 | `RASTER_OUT=1 FANCY_UPSAMPLE=1 CC_TURBO=1` | **Pillow, OpenCV** and libjpeg-turbo `djpeg -dct int` (libjpeg-turbo 2.1 defaults) |
 
-Three cores share one interface: a compact core (`FAST=0`, option `--core small`, ~13.6 clocks per
+Three cores share one interface: a compact core (`FAST=0`, option `--core small`, 12.8-21 clocks per
 pixel, the smallest), a pipelined core that outputs one pixel per clock (`FAST=1`, `--core single`;
 called the fast core in this README, **1.0-2.4 clocks per pixel**) and, for larger FPGAs, a wide core
 (`FAST=2`, `--core wide`, **0.25-0.56 clocks per pixel** on phone photos, four pixels per output beat,
@@ -69,7 +69,7 @@ core_jpeg and H. Ishihara's aq_djpeg (same harness, same board, same files):
 - **Output for real pipelines.** MCU order, or strict raster order with start-of-frame /
   end-of-line flags for an AXI4-Stream video path; RGB, YCbCr or luma-only output (luma-only skips
   the chroma blocks and is ~30 % faster); the colour converter can be removed.
-- **Three cores, one interface.** A compact core (3.4k LEs, ~13.6 clocks/pixel), a fast core
+- **Three cores, one interface.** A compact core (3.4k LEs, 12.8-21 clocks/pixel), a fast core
   (~1-2.4 clocks/pixel, fits the EP2C5) and a wide core (~6k LUTs, 0.25-0.56 clocks/pixel), chosen
   with one parameter.
 - **Verified in depth.** Two independent testbenches (C++ and SystemVerilog) run the same 3,078
@@ -135,7 +135,7 @@ Options of `decode.sh` and `decode.py`:
   |---|---|---|---|---|---|
   | `single` (default) | pipelined (fast) core | 1 | at most 1; 1.0-2.4 clocks per pixel | `libjpeg`, `pillow` | 4,372-4,470 LEs on the Cyclone II EP2C5 |
   | `wide` | wide core | 2 | at most 4; 0.25-0.56 clocks per pixel on phone photos | `libjpeg` (MCU order only) | ~5,800 LUTs and 33 DSPs on an Artix-7; too big for the EP2C5 |
-  | `small` | compact core | 0 (the RTL default) | ~13.6 clocks per pixel | `libjpeg`, `pillow` | 3,460-4,566 LEs on the EP2C5 |
+  | `small` | compact core | 0 (the RTL default) | 12.8-21 clocks per pixel; 16.1-18.8 on phone photos | `libjpeg`, `pillow` | 3,460-4,566 LEs on the EP2C5 |
 
   The test scripts (`tb/run_tests.py --configs`, `tb/sim.sh -c`) name their builds after the core:
   `fmcu`, `frbox`, `frfancy` = single; `wmcu` = wide; `mcu`, `rbox`, `rfancy`, `ep2c5`, `noyrgb` = small.
@@ -222,7 +222,7 @@ only, or no SOI) produces no frame.
 
 | parameter | default | effect |
 |---|---|---|
-| `FAST` | 0 | 0: compact core (~13.6 clocks/pixel, smallest). 1: pipelined core, **~1-2.4 clocks/pixel** (Huffman lookahead tables, 2-lane pipelined IDCT, 1 pixel/clock output); same pixels, same interface. 2: wide core for larger FPGAs (Artix-7 class), **0.25-0.55 clocks/pixel** on phone photos (one Huffman symbol per clock, IDCT in 8 clocks per block, 4 pixels per beat), MCU order only (`RASTER_OUT=0`), same pixels |
+| `FAST` | 0 | 0: compact core (12.8-21 clocks/pixel, smallest). 1: pipelined core, **~1-2.4 clocks/pixel** (Huffman lookahead tables, 2-lane pipelined IDCT, 1 pixel/clock output); same pixels, same interface. 2: wide core for larger FPGAs (Artix-7 class), **0.25-0.55 clocks/pixel** on phone photos (one Huffman symbol per clock, IDCT in 8 clocks per block, 4 pixels per beat), MCU order only (`RASTER_OUT=0`), same pixels |
 | `NPIX` | derived | pixels per beat, 4 for `FAST=2` and 1 otherwise; set by `FAST` (other values stop the elaboration) |
 | `RASTER_OUT` | 0 | 0: pixels in MCU order, 1 KB buffer, any width. 1: raster order via an MCU-row buffer |
 | `ROWBUF_BYTES` | 16384 | row-buffer size for `RASTER_OUT=1`; images whose MCU row does not fit set `err[ERR_WIDTH]` and produce no pixels (the file is still consumed) |
