@@ -15,21 +15,22 @@ VFLAGS  := -Wall -Wno-fatal -Wno-DECLFILENAME -Wno-UNUSEDSIGNAL -Wno-UNUSEDPARAM
            -O2 --x-assign fast --x-initial fast
 all: obj_lane/Vmem_lane obj_lane256/Vmem_lane obj_eng/Vengine obj_eng3/Vengine
 ENG := ../mem_lane.sv ../f2_regs.sv ../jpeg_f2_engine.sv
-obj_lane/Vmem_lane: $(RTL) ../mem_lane.sv tb_mem_lane.cpp
-	verilator $(VFLAGS) -GDW=512 -CFLAGS -DDW=512 -Mdir obj_lane -cc $(RTL) ../mem_lane.sv --exe tb_mem_lane.cpp -o Vmem_lane \
+CHK := ../../../tb/jpeg_checker.sv ../../../tb/jpeg_checker_bind.sv   # the decoder's interface assertions, bound in
+obj_lane/Vmem_lane: $(RTL) ../mem_lane.sv $(CHK) tb_mem_lane.cpp
+	verilator $(VFLAGS) -GDW=512 -CFLAGS -DDW=512 -Mdir obj_lane -cc $(RTL) ../mem_lane.sv $(CHK) --exe tb_mem_lane.cpp -o Vmem_lane \
 	  > obj_lane.log 2>&1 || (cat obj_lane.log; false)
 	$(MAKE) -s -j2 -C obj_lane -f Vmem_lane.mk Vmem_lane
-obj_lane256/Vmem_lane: $(RTL) ../mem_lane.sv tb_mem_lane.cpp
-	verilator $(VFLAGS) -GDW=256 -CFLAGS -DDW=256 -Mdir obj_lane256 -cc $(RTL) ../mem_lane.sv --exe tb_mem_lane.cpp -o Vmem_lane \
+obj_lane256/Vmem_lane: $(RTL) ../mem_lane.sv $(CHK) tb_mem_lane.cpp
+	verilator $(VFLAGS) -GDW=256 -CFLAGS -DDW=256 -Mdir obj_lane256 -cc $(RTL) ../mem_lane.sv $(CHK) --exe tb_mem_lane.cpp -o Vmem_lane \
 	  > obj_lane256.log 2>&1 || (cat obj_lane256.log; false)
 	$(MAKE) -s -j2 -C obj_lane256 -f Vmem_lane.mk Vmem_lane
 # the job engine (../jpeg_f2_engine.sv) with tb_engine.cpp: 4 lanes of 512 bits, 3 lanes of 256 bits
-obj_eng/Vengine: $(RTL) $(ENG) tb_engine.cpp
-	verilator $(subst mem_lane,jpeg_f2_engine,$(VFLAGS)) -GNL=4 -GDW=512 -CFLAGS "-DNL=4 -DDW=512" -Mdir obj_eng -cc $(RTL) $(ENG) \
+obj_eng/Vengine: $(RTL) $(ENG) $(CHK) tb_engine.cpp
+	verilator $(subst mem_lane,jpeg_f2_engine,$(VFLAGS)) -GNL=4 -GDW=512 -CFLAGS "-DNL=4 -DDW=512" -Mdir obj_eng -cc $(RTL) $(ENG) $(CHK) \
 	  --exe tb_engine.cpp -o Vengine > obj_eng.log 2>&1 || (cat obj_eng.log; false)
 	$(MAKE) -s -j2 -C obj_eng -f Vjpeg_f2_engine.mk Vengine
-obj_eng3/Vengine: $(RTL) $(ENG) tb_engine.cpp
-	verilator $(subst mem_lane,jpeg_f2_engine,$(VFLAGS)) -GNL=3 -GDW=256 -CFLAGS "-DNL=3 -DDW=256" -Mdir obj_eng3 -cc $(RTL) $(ENG) \
+obj_eng3/Vengine: $(RTL) $(ENG) $(CHK) tb_engine.cpp
+	verilator $(subst mem_lane,jpeg_f2_engine,$(VFLAGS)) -GNL=3 -GDW=256 -CFLAGS "-DNL=3 -DDW=256" -Mdir obj_eng3 -cc $(RTL) $(ENG) $(CHK) \
 	  --exe tb_engine.cpp -o Vengine > obj_eng3.log 2>&1 || (cat obj_eng3.log; false)
 	$(MAKE) -s -j2 -C obj_eng3 -f Vjpeg_f2_engine.mk Vengine
 clean:

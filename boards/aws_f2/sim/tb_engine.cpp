@@ -5,8 +5,11 @@
 // (on F2: PCIS reads) and checks them as tb_mem_lane.cpp does. Each lane has its own AXI4 port into one
 // memory (on F2: an HBM channel each), with random delays and gaps on every channel. Also checked: the
 // tag of every result, the lanes' start counters, a start written while the lane is busy (ignored and
-// counted), and that a lane has nothing outstanding on its port when it says done.
-//   Vengine [--policy order|size] [--stall P] [--seed N] [--latency N] [--host-lat N] [--max-cycles N] JOBFILE
+// counted), and that a lane has nothing outstanding on its port when it says done. --preload: as soon as a
+// lane starts a job, the host writes the lane's next job (registers and tag, no start) while it runs, and
+// at done only collects and starts it (the lane samples its job at the start, so this must not disturb
+// the running job).
+//   Vengine [--policy order|size] [--preload] [--stall P] [--seed N] [--latency N] [--host-lat N] [--max-cycles N] JOBFILE
 // JOBFILE: as tb_mem_lane.cpp ("file golden expect pad [out_max]"; abort:N = the host aborts the job N
 // clocks after starting it). Policy: jobs in file order, or the largest file first.
 // Prints one line per job, then the batch: the engine's clocks from the first start to the last done
@@ -110,7 +113,7 @@ struct Job {
 int main(int argc, char** argv) {
     Verilated::commandArgs(argc, argv);
     int stall = 0, latency = 40, host_lat = 100; unsigned seed = 1; uint64_t max_cycles = 4000000000ULL;
-    std::string policy = "order"; const char* jobfile = nullptr;
+    std::string policy = "order"; const char* jobfile = nullptr; bool preload = false;
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "--stall") && i + 1 < argc) stall = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--seed") && i + 1 < argc) seed = (unsigned)atoi(argv[++i]);
@@ -118,10 +121,11 @@ int main(int argc, char** argv) {
         else if (!strcmp(argv[i], "--host-lat") && i + 1 < argc) host_lat = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--max-cycles") && i + 1 < argc) max_cycles = strtoull(argv[++i], nullptr, 10);
         else if (!strcmp(argv[i], "--policy") && i + 1 < argc) policy = argv[++i];
+        else if (!strcmp(argv[i], "--preload")) preload = true;
         else if (argv[i][0] != '-' && argv[i][0] != '+') jobfile = argv[i];
     }
     if (!jobfile || (policy != "order" && policy != "size")) {
-        fprintf(stderr, "usage: %s [--policy order|size] [--stall P] [--seed N] [--latency N] [--host-lat N] [--max-cycles N] JOBFILE\n", argv[0]);
+        fprintf(stderr, "usage: %s [--policy order|size] [--preload] [--stall P] [--seed N] [--latency N] [--host-lat N] [--max-cycles N] JOBFILE\n", argv[0]);
         return 2;
     }
     std::vector<Job> jobs;
@@ -338,11 +342,37 @@ int main(int argc, char** argv) {
     size_t biggest = std::max_element(jobs.begin(), jobs.end(), [](const Job& a, const Job& b) { return a.len < b.len; }) - jobs.begin();
     bool busy_start_ok = false, busy_start_tried = false;
     int busy_lane = -1;
-    std::vector<int> lane_job(NL, -1), lane_count(NL, 0);
+    std::vector<int> lane_job(NL, -1), lane_next(NL, -1), lane_count(NL, 0);   // running; written ahead (--preload)
     std::vector<int> sched;                       // the order in which jobs started
     size_t next = 0;
     bool stuck = false;
-    while ((next < order.size() || std::any_of(lane_job.begin(), lane_job.end(), [](int j) { return j >= 0; })) && lite_ok && !stuck) {
+    auto write_job = [&](int l, int j) {          // the job's registers and tag, without a start
+        Job& J = jobs[j];
+        auto wr = [&](int r, uint32_t v) { lite_write(lane_reg(l, r), v); };
+        wr(L_IN_LO, (uint32_t)J.in_addr); wr(L_IN_HI, (uint32_t)(J.in_addr >> 32)); wr(L_LEN, (uint32_t)J.len);
+        wr(L_OUT_LO, (uint32_t)J.out_addr); wr(L_OUT_HI, (uint32_t)(J.out_addr >> 32)); wr(L_OUT_MAX, (uint32_t)J.out_max);
+        wr(L_TAG, J.tag);
+    };
+    auto start_job = [&](int l, int j) {
+        lite_write(lane_reg(l, L_CTRL), 1);
+        Job& J = jobs[j];
+        J.lane = l; J.host_t0 = cyc; lane_job[l] = j; lane_count[l]++; sched.push_back(j);
+        if (preload && next < order.size()) { int k = order[next++]; write_job(l, k); lane_next[l] = k; }
+        if ((size_t)j == biggest && !busy_start_tried) {
+            // a second start while the lane runs the biggest file: ignored, counted, the job unaffected (its
+            // RUN_TAG would change: to 0xBAD, or with --preload to the next job's tag already written)
+            busy_start_tried = true; busy_lane = l;
+            uint32_t a = lite_read(lane_reg(l, L_CTRL));
+            if (!preload) lite_write(lane_reg(l, L_TAG), 0xBAD);
+            lite_write(lane_reg(l, L_CTRL), 1);
+            uint32_t b = lite_read(lane_reg(l, L_CTRL));
+            busy_start_ok = (b >> 16) == (a >> 16) + 1 && (b & 0xFFFF) == (a & 0xFFFF);
+            if (!busy_start_ok) fprintf(stderr, "lane %d: start while busy: CTRL 0x%08x -> 0x%08x\n", l, a, b);
+        }
+    };
+    auto pending = [&]() { return next < order.size() || std::any_of(lane_job.begin(), lane_job.end(), [](int j) { return j >= 0; })
+                                  || std::any_of(lane_next.begin(), lane_next.end(), [](int j) { return j >= 0; }); };
+    while (pending() && lite_ok && !stuck) {
         uint64_t dm = lite_read(R_DONE_LO);
         if (NL > 32) dm |= (uint64_t)lite_read(R_DONE_HI) << 32;
         bool progress = false;
@@ -358,24 +388,10 @@ int main(int argc, char** argv) {
                 if (!exp_abort) fprintf(stderr, "lane %d: %s did not finish: aborted\n", l, J.file.c_str());
             }
         }
-        for (int l = 0; l < NL && next < order.size(); l++) {
+        for (int l = 0; l < NL; l++) {
             if (lane_job[l] >= 0) continue;
-            int j = order[next++];
-            Job& J = jobs[j];
-            auto wr = [&](int r, uint32_t v) { lite_write(lane_reg(l, r), v); };
-            wr(L_IN_LO, (uint32_t)J.in_addr); wr(L_IN_HI, (uint32_t)(J.in_addr >> 32)); wr(L_LEN, (uint32_t)J.len);
-            wr(L_OUT_LO, (uint32_t)J.out_addr); wr(L_OUT_HI, (uint32_t)(J.out_addr >> 32)); wr(L_OUT_MAX, (uint32_t)J.out_max);
-            wr(L_TAG, J.tag); wr(L_CTRL, 1);
-            J.lane = l; J.host_t0 = cyc; lane_job[l] = j; lane_count[l]++; sched.push_back(j); progress = true;
-            if ((size_t)j == biggest && !busy_start_tried) {
-                // a second start while the lane runs the biggest file: ignored, counted, the job unaffected
-                busy_start_tried = true; busy_lane = l;
-                uint32_t a = lite_read(lane_reg(l, L_CTRL));
-                wr(L_TAG, 0xBAD); wr(L_CTRL, 1);
-                uint32_t b = lite_read(lane_reg(l, L_CTRL));
-                busy_start_ok = (b >> 16) == (a >> 16) + 1 && (b & 0xFFFF) == (a & 0xFFFF);
-                if (!busy_start_ok) fprintf(stderr, "lane %d: start while busy: CTRL 0x%08x -> 0x%08x\n", l, a, b);
-            }
+            if (lane_next[l] >= 0) { int j = lane_next[l]; lane_next[l] = -1; start_job(l, j); progress = true; }
+            else if (next < order.size()) { int j = order[next++]; write_job(l, j); start_job(l, j); progress = true; }
         }
         if (!progress) idle(64);
         if ((uint64_t)cyc > max_cycles) { fprintf(stderr, "batch did not finish in %llu clocks\n", (unsigned long long)max_cycles); stuck = true; }
@@ -396,7 +412,7 @@ int main(int argc, char** argv) {
     }
     uint64_t wall = t1 > t0 ? t1 - t0 : 0;
     uint64_t bound = std::max<uint64_t>(longest, (busy_sum + NL - 1) / NL);
-    printf("schedule (%s):", policy.c_str());
+    printf("schedule (%s%s):", policy.c_str(), preload ? ", next job written ahead" : "");
     for (size_t k = 0; k < sched.size() && k < 400; k++) printf(" %d", sched[k]);
     printf("\nbatch: %zu jobs on %d lanes, wall %llu clocks (engine clock, first start to last done), lane busy %llu, "
            "utilisation %.3f, lower bound %llu (wall / bound %.3f); AXI-Lite accesses %lld, host latency %d\n",
@@ -407,8 +423,8 @@ int main(int argc, char** argv) {
                && busy_start_tried && busy_start_ok;
     printf("checks: id %d, counters %d, start-while-busy %d, protocol %d, drained %d\n", id_ok, counters_ok,
            busy_start_tried && busy_start_ok, proto_ok, undrained == 0);
-    printf("ENGINE JOBS %d/%zu passed (NL=%d, DW=%d, policy %s, stall %d%%, seed %u)%s\n", passed, jobs.size(), NL, DW,
-           policy.c_str(), stall, seed, all ? "" : " - CHECKS FAILED");
+    printf("ENGINE JOBS %d/%zu passed (NL=%d, DW=%d, policy %s%s, stall %d%%, seed %u)%s\n", passed, jobs.size(), NL, DW,
+           policy.c_str(), preload ? " + preload" : "", stall, seed, all ? "" : " - CHECKS FAILED");
     delete d;
     return all ? 0 : 1;
 }

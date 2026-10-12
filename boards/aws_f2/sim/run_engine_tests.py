@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """The F2 job engine (../jpeg_f2_engine.sv) as the host would drive it (tb_engine.cpp): the job list of
-run_lane_tests.py (every corpus file, the 50 malformed cases, zeros after the EOI, a file without an SOI
-and a mid-frame abort, a too-small output area; a clean file after each special one) as one batch, on 4
+run_lane_tests.py (every corpus file, the 50 malformed cases, the 230 truncations, zeros after the EOI, a
+file without an SOI, mid-frame aborts, a too-small output area; a clean file after each special one) as one batch, on 4
 lanes of 512 bits and 3 lanes of 256 bits, jobs in file order and largest first, with and without 30 %
-random gaps on every memory channel. --photos: a batch of photos (golden: libjpeg 9e's djpeg -dct int
+random gaps on every memory channel; two more batches with the host writing each lane's next job while
+it runs (--preload). --photos: a batch of photos (golden: libjpeg 9e's djpeg -dct int
 -nosmooth) with both policies; the batch lines give the engine's wall clocks against the lower bound.
   run_engine_tests.py [--quick] [--host-lat N] [--photos file.jpg ...]      (needs obj_eng*/Vengine: make)"""
 import os, sys, subprocess
@@ -13,12 +14,12 @@ sys.path.insert(0, HERE)
 import run_lane_tests as LT
 EXES = {"4x512": os.path.join(HERE, "obj_eng", "Vengine"), "3x256": os.path.join(HERE, "obj_eng3", "Vengine")}
 
-def run(cfg, jobs, policy, stall, seed, host_lat, tag):
+def run(cfg, jobs, policy, stall, seed, host_lat, tag, extra=()):
     os.makedirs(LT.OUT, exist_ok=True)
-    jf = os.path.join(LT.OUT, f"engine_{tag}_{cfg}_{policy}_{stall}.txt")
+    jf = os.path.join(LT.OUT, f"engine_{tag}_{cfg}_{policy}_{stall}{''.join(extra).replace('-', '_')}.txt")
     with open(jf, "w") as f: f.write("\n".join(jobs) + "\n")
-    r = subprocess.run([EXES[cfg], "--policy", policy, "--stall", str(stall), "--seed", str(seed), "--host-lat", str(host_lat), jf],
-                       capture_output=True, text=True, timeout=14400)
+    r = subprocess.run([EXES[cfg], "--policy", policy, "--stall", str(stall), "--seed", str(seed), "--host-lat", str(host_lat)]
+                       + list(extra) + [jf], capture_output=True, text=True, timeout=14400)
     lines = r.stdout.strip().splitlines()
     res = [l for l in lines if l.endswith(" PASS") or l.endswith(" FAIL")]
     fails = [l for l in res if l.endswith(" FAIL")]
@@ -38,13 +39,14 @@ def main():
     for i, s in enumerate(special + unsup):
         mixed += [s, ok_jobs[i % len(ok_jobs)]]
     mixed += ok_jobs
-    runs = [("4x512", "order", 0, 1), ("4x512", "size", 30, 2), ("3x256", "size", 0, 3), ("3x256", "order", 30, 4)]
+    runs = [("4x512", "order", 0, 1, ()), ("4x512", "size", 30, 2, ()), ("3x256", "size", 0, 3, ()), ("3x256", "order", 30, 4, ()),
+            ("4x512", "order", 30, 6, ("--preload",)), ("3x256", "size", 0, 7, ("--preload",))]
     if quick: runs = runs[1:2]
     total = passed = 0; all_ok = True
-    for cfg, policy, stall, seed in runs:
-        ok, p, n, fails, keep, res, err = run(cfg, mixed, policy, stall, seed, host_lat, "mixed")
+    for cfg, policy, stall, seed, extra in runs:
+        ok, p, n, fails, keep, res, err = run(cfg, mixed, policy, stall, seed, host_lat, "mixed", extra)
         total += n; passed += p; all_ok = all_ok and ok
-        print(f"{cfg} {policy} stall {stall}%: " + " | ".join(keep), flush=True)
+        print(f"{cfg} {policy}{' preload' if extra else ''} stall {stall}%: " + " | ".join(keep), flush=True)
         for l in fails[:10]: print("  FAIL", l)
         if not ok and err.strip(): print("  stderr:", err.strip()[-600:])
     if photos:

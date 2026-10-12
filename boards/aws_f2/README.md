@@ -22,7 +22,11 @@ python3 run_engine_tests.py [--photos ...]
 Results (2026-10-10): lane 4,920/4,920 jobs (615 per list - with the 230 cut files of
 `tb/run_trunc_tests.py` - x 2 widths x 4 gap settings) and 3 photos at both widths with 30 % gaps
 (identical to libjpeg 9e, the decoder never waited for the writer); engine 2,460/2,460 jobs in 4 batches
-(4 x 512 and 3 x 256 bits, both orders, with and without gaps) with every check passed. The 24 photo files (the 12 photos and their 4:2:0 copies) as one batch on 4 lanes of 512 bits, all
+(4 x 512 and 3 x 256 bits, both orders, with and without gaps) with every check passed. Since 2026-10-12
+every lane's decoder also runs the interface checker (`../../tb/jpeg_checker.sv`, bound in): lane
+4,920/4,920 again, and the engine 3,690/3,690 jobs in 6 batches - the 4 above and 2 in which the host
+writes each lane's next job while it still runs and starts it at its done (`--preload`), with every
+check passed. The 24 photo files (the 12 photos and their 4:2:0 copies) as one batch on 4 lanes of 512 bits, all
 identical to libjpeg 9e: 29.79 M engine clocks from the first start to the last done in file order, 29.04 M
 largest file first, against a lower bound of 28.68 M (the lanes' work divided by 4): 1.039 and 1.013 times
 the bound, lanes busy 96 and 99 %, with a memory of unlimited bandwidth (40-80 clocks of read latency,
@@ -31,8 +35,9 @@ takes 1-2 us, which adds about 0.1-0.2 % per 12 MP photo and dominates for corpu
 corpus batches' 45-58 % show). "Largest first" is largest file first, a stand-in for the decode time.
 At F2's 250 MHz (not measured) the 29.04 M clocks would be 116 ms; the records are 4 bytes per pixel,
 about 2.7 GB/s per lane at that clock.
-Not covered yet: the engine testbench never writes a busy lane's next job and starts it at done (the
-lane testbench checks that job inputs changed while busy are ignored, so this should work).
+The checker's first run here found a decoder bug: the bytes after a file's EOI that a lane feeds before
+it sees frame_done (jobs with zeros after the file) set ERR_SYNC on the image after its frame_done; the parser now skips bytes
+before an SOI without an error (the lanes had captured the error bits at frame_done, so no job had failed).
 Found by these tests and fixed: a job's late read data could reach the next job when the frame ended
 before the file did; a mid-frame abort left a pixel beat in the decoder that the next job counted in the
 clock before the decoder's reset acted (the lane now ignores the decoder in that clock; with the fix
