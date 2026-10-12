@@ -109,6 +109,19 @@ FIX_1_961570560, FIX_2_053119869, FIX_2_562915447, FIX_3_072711026 = 16069, 1681
 RANGE_CENTER = 128 << 2          # RANGE_BITS = 2
 RANGE_MASK = RANGE_CENTER*2 - 1  # 1023
 
+# The decoder's documented 16-bit limits (rtl/jpeg_coefdec.sv, jpeg_huffdec*.sv, jpeg_idct*.sv): the
+# dequantised coefficient and the IDCT's pass-1 workspace saturate to 16 bits, where libjpeg keeps an int.
+# Images from 8-bit sources never reach these limits (all test images: SAT[0] stays 0), so the model is
+# libjpeg 9e's arithmetic for them; for synthetic extreme files (tb/make_arith.py) it is the decoder's.
+SAT = [0]                        # saturations so far (Decoder.run resets it; Decoder.saturations)
+def sat16(v):
+    if v > 32767: SAT[0] += 1; return 32767
+    if v < -32768: SAT[0] += 1; return -32768
+    return v
+def wrap16(v):
+    """(JCOEF) s of libjpeg's decode_mcu = the decoder's 16-bit DC predictor"""
+    return ((v + 32768) & 0xFFFF) - 32768
+
 def range_limit(v):
     """IDCT_range_limit[(v) & RANGE_MASK] of libjpeg 9 (sample_range_limit - RANGE_SUBSET)."""
     v &= RANGE_MASK
@@ -150,7 +163,7 @@ def idct_islow(coef):
         z3 = x[4] << CONST_BITS
         out = idct_1d_core(x[0], x[1], x[2], x[3], x[4], x[5], x[6], x[7], z2, z3)
         for r in range(8):
-            ws[8*r + c] = out[r] >> (CONST_BITS - PASS1_BITS)
+            ws[8*r + c] = sat16(out[r] >> (CONST_BITS - PASS1_BITS))   # the decoder's 16-bit workspace
     res = [0]*64
     for r in range(8):                          # pass 2: rows
         w = ws[8*r:8*r+8]
@@ -271,6 +284,10 @@ class Decoder:
         self.saw_jfif = self.saw_adobe = False; self.adobe_transform = None   # libjpeg examine_app0/app14
     def u16(self, p): return (self.data[p] << 8) | self.data[p+1]
     def run(self):
+        SAT[0] = 0
+        try: return self._run()
+        finally: self.saturations = SAT[0]
+    def _run(self):
         d = self.data; p = 0
         assert d[0] == 0xFF and d[1] == 0xD8, "no SOI"; p = 2
         while True:
@@ -331,7 +348,7 @@ class Decoder:
         zz = [0]*64
         t, l, code = huff_decode(br, comp['dct'])
         diff = extend(br.bits(t), t) if t else 0
-        pred += diff; zz[0] = pred
+        pred = wrap16(pred + diff); zz[0] = pred
         k = 1
         while k < 64:
             rs, l, code = huff_decode(br, comp['act'])
@@ -344,7 +361,7 @@ class Decoder:
             zz[k] = extend(br.bits(s), s); k += 1
         q = self.qt[comp['tq']]
         coef = [0]*64
-        for k in range(64): coef[ZIGZAG[k]] = zz[k] * q[ZIGZAG[k]]
+        for k in range(64): coef[ZIGZAG[k]] = sat16(zz[k] * q[ZIGZAG[k]])   # dequantised, 16-bit as in the decoder
         samp = idct_islow(coef)
         if self.dump is not None and (self.maxblocks is None or self.nblocks_dumped < self.maxblocks):
             self.dump.write("BLOCK mcu=%d n=%d comp=%d bx=%d by=%d dcpred=%d\n" % (mcu_no, blk_no, comp['id'], bx, by, pred))

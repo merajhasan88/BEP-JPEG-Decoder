@@ -273,7 +273,14 @@ an Adobe APP14 with transform 0 and neither JFIF nor the ids 1,2,3) are passed t
 conversion, RGB output only (YCbCr or Y output of such a file is `ERR_SOF_TYPE`). Headers are
 checked as T.81 requires (since 2026-10-10 also: segment lengths, the 4-byte DRI, distinct component
 ids, the baseline AC symbol domain). Dequantised coefficients and the IDCT workspace are 16-bit (saturating); real images
-from 8-bit sources stay far inside that, so all test files match exactly.
+from 8-bit sources stay far inside that, so all test files match exactly. The limits themselves are tested
+(`tb/make_arith.py`, `tb/run_arith_tests.py`): 17 synthetic files written straight from quantised coefficients -
+AC +-1023 at every zig-zag position with the largest Q that stays inside the limits (and that Q + 1), every DC
+value from -1024 to 1023, a DC predictor past 16 bits, dense blocks of +-1023 with Q = 1, 8 and 255, chroma
+extremes in 4:2:0. Inside the limits the decoder equals libjpeg 9e exactly; beyond them it saturates exactly as
+`model/jpeg_golden.py` does, the same in all three cores (918 runs: 9 configurations x 3 formats x 2 stall
+settings). Two of the files hold all 256 sign corners of both IDCT passes; every intermediate value is linear
+in a pass's inputs, so no file can overflow the IDCT's datapath.
 
 ## Verification
 

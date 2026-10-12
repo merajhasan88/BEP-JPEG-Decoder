@@ -4,7 +4,8 @@
 #                        without random stalls, against model/jpeg_golden.py (run_tests.py), then
 #                        several images streamed back to back without reset (run_stream_tests.py),
 #                        malformed files (run_malformed_tests.py), and files cut at 230 points and the
-#                        malformed files, each followed by a valid image (run_trunc_tests.py)
+#                        malformed files, each followed by a valid image (run_trunc_tests.py), and the
+#                        arithmetic edge cases of make_arith.py (run_arith_tests.py)
 #   The corpus is tb/corpus (generated from test_images/adapter.jpg by ../scripts/make_corpus.py).
 #   make lint
 #   make decode       -> decode ../test_images/*.jpg with the C++ harness into ../out/
@@ -91,6 +92,7 @@ test: $(BINS) $(MULTI)
 	python3 run_stream_tests.py
 	python3 run_malformed_tests.py
 	python3 run_trunc_tests.py
+	python3 run_arith_tests.py
 
 clean:
 	rm -rf obj_* out build *.log

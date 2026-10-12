@@ -1,0 +1,104 @@
+{
+ "ari_ac1023_q1_444": {
+  "bytes": 1877,
+  "cls": "inside",
+  "libjpeg_diff_bytes": 0,
+  "saturations": 0
+ },
+ "ari_ac1023_q1_grey": {
+  "bytes": 1192,
+  "cls": "inside",
+  "libjpeg_diff_bytes": 0,
+  "saturations": 0
+ },
+ "ari_ac1023_q255_grey": {
+  "bytes": 1192,
+  "cls": "beyond",
+  "libjpeg_diff_bytes": 5248,
+  "saturations": 1134
+ },
+ "ari_ac1023_q32_grey": {
+  "bytes": 1192,
+  "cls": "beyond",
+  "libjpeg_diff_bytes": 5632,
+  "saturations": 1008
+ },
+ "ari_ac1023_qlimit1_grey": {
+  "bytes": 1192,
+  "cls": "beyond",
+  "libjpeg_diff_bytes": 1664,
+  "saturations": 496
+ },
+ "ari_ac1023_qlimit_grey": {
+  "bytes": 1192,
+  "cls": "inside",
+  "libjpeg_diff_bytes": 0,
+  "saturations": 0
+ },
+ "ari_chroma_dc_q8_420": {
+  "bytes": 878,
+  "cls": "inside",
+  "libjpeg_diff_bytes": 0,
+  "saturations": 0
+ },
+ "ari_corners_pass1_q255_grey": {
+  "bytes": 8874,
+  "cls": "beyond",
+  "libjpeg_diff_bytes": 1465,
+  "saturations": 3952
+ },
+ "ari_corners_pass2_q255_grey": {
+  "bytes": 8568,
+  "cls": "beyond",
+  "libjpeg_diff_bytes": 12064,
+  "saturations": 18432
+ },
+ "ari_dc_sweep_q8_grey": {
+  "bytes": 2363,
+  "cls": "inside",
+  "libjpeg_diff_bytes": 0,
+  "saturations": 0
+ },
+ "ari_dc_sweep_q9_grey": {
+  "bytes": 2363,
+  "cls": "beyond",
+  "libjpeg_diff_bytes": 14528,
+  "saturations": 1816
+ },
+ "ari_dc_wrap_grey": {
+  "bytes": 692,
+  "cls": "beyond",
+  "libjpeg_diff_bytes": 3968,
+  "saturations": 496
+ },
+ "ari_dense_extreme_q1_grey": {
+  "bytes": 17536,
+  "cls": "inside",
+  "libjpeg_diff_bytes": 0,
+  "saturations": 0
+ },
+ "ari_dense_extreme_q255_grey": {
+  "bytes": 17536,
+  "cls": "beyond",
+  "libjpeg_diff_bytes": 2956,
+  "saturations": 7908
+ },
+ "ari_dense_extreme_q8_grey": {
+  "bytes": 17536,
+  "cls": "beyond",
+  "libjpeg_diff_bytes": 2871,
+  "saturations": 3061
+ },
+ "ari_dense_inside_grey": {
+  "bytes": 9054,
+  "cls": "inside",
+  "libjpeg_diff_bytes": 0,
+  "saturations": 0
+ },
+ "ari_q255_small_grey": {
+  "bytes": 1887,
+  "cls": "inside",
+  "libjpeg_diff_bytes": 0,
+  "saturations": 0
+ }
+}

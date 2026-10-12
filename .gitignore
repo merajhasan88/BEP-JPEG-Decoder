@@ -55,8 +55,9 @@ bench/others/quartus/cmp*/
 # Images: decoded outputs, golden decodes and simulation outputs are generated, not kept.  The
 # JPEGs that are kept: test_images/ (the owner's photos), tb/corpus/ (made from
 # test_images/adapter.jpg by scripts/make_corpus.py, see tb/corpus/SOURCES.md) and tb/malformed/
-# (tb/make_malformed.py) and tb/golden/ (the reference images of the regression, made by
-# model/jpeg_golden.py through tb/run_tests.py; tb/run_tests.sh compares against them).
+# (tb/make_malformed.py), tb/arith/ (tb/make_arith.py: synthetic files at the arithmetic limits) and
+# tb/golden/ (the reference images of the regression, made by model/jpeg_golden.py through
+# tb/run_tests.py; tb/run_tests.sh compares against them).
 *.jpg
 *.jpeg
 *.png
@@ -67,6 +68,7 @@ bench/others/quartus/cmp*/
 !test_images/*.jpg
 !tb/corpus/*.jpg
 !tb/malformed/*.jpg
+!tb/arith/*.jpg
 !tb/golden/*.pnm
 tb/golden_legacy/
 
