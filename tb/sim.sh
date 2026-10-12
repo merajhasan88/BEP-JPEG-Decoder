@@ -43,10 +43,11 @@ case $base in
   *) echo "unknown configuration $CFG" >&2; exit 2;;
 esac
 RTL=$(grep -v '^//' "$RTLDIR/files.f" | sed "s|^|$RTLDIR/|")
+TB="$HERE/jpeg_checker.sv $HERE/tb_jpeg.sv"     # the testbench and its interface assertions
 B=$HERE/build/${SIM}_$CFG
 stale() {   # rebuild when a source is newer than the last build
   [ ! -f "$B/stamp" ] && return 0
-  for f in $RTL "$HERE/tb_jpeg.sv"; do [ "$f" -nt "$B/stamp" ] && return 0; done
+  for f in $RTL $TB; do [ "$f" -nt "$B/stamp" ] && return 0; done
   return 1
 }
 if stale; then
@@ -55,19 +56,19 @@ if stale; then
     verilator)
       G=""; for p in $P; do G="$G -G$p"; done
       verilator --binary --timing -Wno-fatal -Wno-lint -Wno-style -O2 --x-assign fast --x-initial fast \
-        --top-module tb_jpeg $G -Mdir "$B" $RTL "$HERE/tb_jpeg.sv" -o Vtb > "$B/build.log" 2>&1 \
+        --top-module tb_jpeg $G -Mdir "$B" $RTL $TB -o Vtb > "$B/build.log" 2>&1 \
         || { tail -30 "$B/build.log"; exit 1; };;
     xsim)
       G=""; for p in $P; do G="$G -generic_top $p"; done
-      ( cd "$B" && xvlog -sv $RTL "$HERE/tb_jpeg.sv" > build.log 2>&1 && \
+      ( cd "$B" && xvlog -sv $RTL $TB > build.log 2>&1 && \
         xelab tb_jpeg $G -timescale 1ns/1ps -s tb_snap >> build.log 2>&1 ) || { tail -30 "$B/build.log"; exit 1; };;
     icarus)
       G=""; for p in $P; do G="$G -Ptb_jpeg.$p"; done
-      iverilog -g2012 -s tb_jpeg $G -o "$B/tb.vvp" $RTL "$HERE/tb_jpeg.sv" > "$B/build.log" 2>&1 \
+      iverilog -g2012 -s tb_jpeg $G -o "$B/tb.vvp" $RTL $TB > "$B/build.log" 2>&1 \
         || { tail -30 "$B/build.log"; exit 1; };;
     questa)
       G=""; for p in $P; do G="$G -g$p"; done
-      ( cd "$B" && vlib work > build.log 2>&1 && vlog -sv $RTL "$HERE/tb_jpeg.sv" >> build.log 2>&1 ) \
+      ( cd "$B" && vlib work > build.log 2>&1 && vlog -sv $RTL $TB >> build.log 2>&1 ) \
         || { tail -30 "$B/build.log"; exit 1; }
       echo "$G" > "$B/generics";;
     *) echo "unknown simulator $SIM" >&2; exit 2;;

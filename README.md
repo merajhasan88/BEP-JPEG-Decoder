@@ -328,6 +328,14 @@ Both regressions compare against the reference images in `tb/golden/` (made by t
   the baseline domain, libjpeg 9 colour transforms) x 9 configurations x 2 stall settings =
   **900 runs**: each must end with `frame_done`, the expected error bit and, for header
   errors, no pixels.
+- **Interface assertions** (`tb/jpeg_checker.sv`, 2026-10-12): bound into the decoder in every C++
+  harness build and instantiated next to it in the SystemVerilog testbench, so every run of every suite
+  checks the port contract above: a waiting pixel beat stays valid and unchanged; `frame_start` and
+  `frame_done` alternate; pixels only inside a frame, within the image, `px_sof` exactly at (0,0) and
+  `px_eol` exactly at a row's end; the next image's SOI is not taken while a frame is open, `err` is
+  cleared after it and does not change from `frame_done` until then; and `frame_done` follows a file's
+  last byte within a bound. A violation ends the run (`$fatal`). `tb/run_checker_tests.py` makes each
+  rule fire on a deliberate violation (12 scenarios), so a silent checker cannot pass.
 - **Systematic truncation** (`tb/run_trunc_tests.py`, 2026-10-10): three corpus files (restart
   intervals, an EXIF thumbnail, grey) cut at 230 points - every segment boundary, after each marker
   and length field, mid-payload, around the scan's restart markers, before and inside the EOI - each

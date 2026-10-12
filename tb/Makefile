@@ -30,6 +30,7 @@ RTL      := $(RTL_DIR)/jpeg_pkg.sv $(RTL_DIR)/jpeg_sdp_ram.sv $(RTL_DIR)/jpeg_bl
             $(RTL_DIR)/jpeg_mcuout.sv $(RTL_DIR)/jpeg_raster_fast.sv $(RTL_DIR)/jpeg_dec_fast.sv \
             $(RTL_DIR)/jpeg_huffdec_wide.sv $(RTL_DIR)/jpeg_idct1d.sv $(RTL_DIR)/jpeg_idct_wide.sv \
             $(RTL_DIR)/jpeg_mcuout_wide.sv $(RTL_DIR)/jpeg_dec_wide.sv $(RTL_DIR)/jpeg_decoder.sv
+CHK      := jpeg_checker.sv jpeg_checker_bind.sv     # interface assertions, bound into jpeg_decoder
 TRACE    ?= 0
 VFLAGS   := -Wall -Wno-fatal -Wno-DECLFILENAME -Wno-UNUSEDSIGNAL -Wno-UNUSEDPARAM --top-module jpeg_decoder -O2 --x-assign fast --x-initial fast
 ifeq ($(TRACE),1)
@@ -54,17 +55,17 @@ VROOT      := $(shell verilator --getenv VERILATOR_ROOT)
 
 all: $(BINS)
 
-obj_%/Vjpeg_decoder: $(RTL) tb_jpeg.cpp
-	verilator $(VFLAGS) $(CFG_$*) -Mdir obj_$* -cc $(RTL) --exe tb_jpeg.cpp -o Vjpeg_decoder > obj_$*.log 2>&1 || (cat obj_$*.log; false)
+obj_%/Vjpeg_decoder: $(RTL) $(CHK) tb_jpeg.cpp
+	verilator $(VFLAGS) $(CFG_$*) -Mdir obj_$* -cc $(RTL) $(CHK) --exe tb_jpeg.cpp -o Vjpeg_decoder > obj_$*.log 2>&1 || (cat obj_$*.log; false)
 	$(MAKE) -s -j2 -C obj_$* -f Vjpeg_decoder.mk Vjpeg_decoder
 
 # raster + fancy upsampling with a row buffer of N bytes (scripts/decode.py --profile pillow sizes N
 # for the widest image): obj_frfancy_rbN (FAST=1), obj_rfancy_rbN (compact core)
-obj_frfancy_rb%/Vjpeg_decoder: $(RTL) tb_jpeg.cpp
-	verilator $(VFLAGS) $(CFG_frfancy) -GROWBUF_BYTES=$* -Mdir obj_frfancy_rb$* -cc $(RTL) --exe tb_jpeg.cpp -o Vjpeg_decoder > obj_frfancy_rb$*.log 2>&1 || (cat obj_frfancy_rb$*.log; false)
+obj_frfancy_rb%/Vjpeg_decoder: $(RTL) $(CHK) tb_jpeg.cpp
+	verilator $(VFLAGS) $(CFG_frfancy) -GROWBUF_BYTES=$* -Mdir obj_frfancy_rb$* -cc $(RTL) $(CHK) --exe tb_jpeg.cpp -o Vjpeg_decoder > obj_frfancy_rb$*.log 2>&1 || (cat obj_frfancy_rb$*.log; false)
 	$(MAKE) -s -j2 -C obj_frfancy_rb$* -f Vjpeg_decoder.mk Vjpeg_decoder
-obj_rfancy_rb%/Vjpeg_decoder: $(RTL) tb_jpeg.cpp
-	verilator $(VFLAGS) $(CFG_rfancy) -GROWBUF_BYTES=$* -Mdir obj_rfancy_rb$* -cc $(RTL) --exe tb_jpeg.cpp -o Vjpeg_decoder > obj_rfancy_rb$*.log 2>&1 || (cat obj_rfancy_rb$*.log; false)
+obj_rfancy_rb%/Vjpeg_decoder: $(RTL) $(CHK) tb_jpeg.cpp
+	verilator $(VFLAGS) $(CFG_rfancy) -GROWBUF_BYTES=$* -Mdir obj_rfancy_rb$* -cc $(RTL) $(CHK) --exe tb_jpeg.cpp -o Vjpeg_decoder > obj_rfancy_rb$*.log 2>&1 || (cat obj_rfancy_rb$*.log; false)
 	$(MAKE) -s -j2 -C obj_rfancy_rb$* -f Vjpeg_decoder.mk Vjpeg_decoder
 
 # decode every JPEG in ../test_images with the C++ harness (FAST=1, MCU order: the pixels of
@@ -75,6 +76,11 @@ decode: obj_fmcu/Vjpeg_decoder
 	  [ -f "$$f" ] || continue; b=$$(basename "$$f"); \
 	  printf "%-30s " "$$b"; ./obj_fmcu/Vjpeg_decoder "$$f" "../out/$${b%.*}.ppm" --quiet 2>&1 | grep -o "cycles=.*" || echo "failed"; \
 	done; echo "outputs in ../out"
+
+# the interface assertions on their own (test_checker.cpp): each rule must fire on its violation
+obj_chk/Vchk: jpeg_checker.sv test_checker.cpp
+	verilator -Wno-fatal --top-module jpeg_checker -O2 -Mdir obj_chk -cc jpeg_checker.sv --exe test_checker.cpp -o Vchk > obj_chk.log 2>&1 || (cat obj_chk.log; false)
+	$(MAKE) -s -j2 -C obj_chk -f Vjpeg_checker.mk Vchk
 
 # multi-image harness, linked against the model compiled for Vjpeg_decoder
 obj_%/Vmulti: obj_%/Vjpeg_decoder tb_multi.cpp
@@ -87,7 +93,8 @@ multi: $(MULTI)
 lint:
 	$(foreach c,$(CONFIGS),echo "== $(c)"; verilator --lint-only -Wall -Wno-DECLFILENAME $(CFG_$(c)) --top-module jpeg_decoder $(RTL);)
 
-test: $(BINS) $(MULTI)
+test: $(BINS) $(MULTI) obj_chk/Vchk
+	python3 run_checker_tests.py
 	python3 run_tests.py
 	python3 run_stream_tests.py
 	python3 run_malformed_tests.py
