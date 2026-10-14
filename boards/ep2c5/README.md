@@ -47,7 +47,9 @@ python3 ../scripts/jtag_decode.py photo.jpg ...    # stream each file, read deco
 #   the reference checksum comes from libjpeg 9e (bench/tools.py builds it; or --djpeg PATH)
 cd ../fpga_raster && quartus_sh --flow compile jpeg_fpga_raster                          # UART demo
 quartus_pgm -m jtag -o "p;output_files/jpeg_fpga_raster.sof"
-./compile_all.sh                                   # every project, one after another
+./compile_all.sh [project ...]                     # every project (or those named), one after another; each
+#   compiles the commit checked out: no modified tracked file before or after the compile, every file its .qsf
+#   names committed (else not compiled); output_files/provenance.txt records the commit and the files' sha256
 ```
 
 On the board (2026-10-01 and 2026-10-04, `fpga_jtag` at 95 MHz): every test photo decodes with libjpeg's checksum

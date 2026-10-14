@@ -13,6 +13,10 @@
 # Environment: VIVADO_PART (default xcku5p-ffvb676-2-e), VIVADO_THREADS. The route stage writes the
 # reports and summary.txt: the worst setup path overall, inside a decoder (start and end in u_dut) and
 # outside the decoders (the harness), each with its slack and, when it fails, Fmax = 1 / (period - slack).
+# The stages that read sources (lane, synth) copy them into <out_dir>/src and check them against the commit checked
+# out first (../../../boards/acorn_cle215/provenance.tcl; BUILD_UNCOMMITTED=1 probes uncommitted files, recorded as
+# such): provenance_lane.txt and provenance.txt; the synth stage stops if lane.edf comes from another commit, and
+# summary.txt's first line names the commit.
 if {[info exists ::env(VIVADO_THREADS)]} { set_param general.maxThreads $::env(VIVADO_THREADS) }
 set n [lindex $argv 0]; set period [lindex $argv 1]; set out [lindex $argv 2]
 set stage [lindex $argv 3]; if {$stage eq ""} { set stage all }
@@ -22,21 +26,23 @@ set here  [file dirname [file normalize [info script]]]
 set root  [file normalize $here/../../..]
 set rtl   $root/rtl
 set acorn $root/boards/acorn_cle215
+source $acorn/provenance.tcl
+prov_init [info script]
 file mkdir $out
 
-proc read_decoder {rtl} {
-  # the decoder's sources in compile order (rtl/files.f)
-  set fh [open $rtl/files.f]
-  foreach line [split [read $fh] "\n"] {
-    set f [string trim $line]
-    if {$f ne "" && [string index $f 0] ne "/"} { read_verilog -sv $rtl/$f }
-  }
-  close $fh
+# the decoder's sources in compile order (rtl/files.f) and the other files given, copied into $out/src and checked
+# against the commit (provenance.tcl); returns the copies
+proc snapshot_decoder {rtl out files} {
+  prov_snapshot $out [list $rtl/files.f]
+  set dec {}
+  foreach f [prov_list [prov_path $rtl/files.f]] { lappend dec $rtl/$f }
+  return [prov_snapshot $out [concat $dec $files]]
 }
 
 if {$stage eq "lane"} {
-  read_decoder $rtl
-  read_verilog -sv $acorn/bench_lane.sv
+  set src [snapshot_decoder $rtl $out [list $acorn/bench_lane.sv]]
+  prov_write $out "bench_lane FAST=2 out of context, part $part, period $period ns" provenance_lane.txt
+  read_verilog -sv $src
   set fh [open $out/lane_clock.xdc w]
   puts $fh "create_clock -period $period -name clk \[get_ports clk\]"
   puts $fh "create_clock -period $period -name dclk \[get_ports dclk\]"
@@ -53,13 +59,20 @@ if {$stage eq "synth" || $stage eq "all"} {
   close $fh
   read_xdc $out/clock.xdc
   if {$n > 1} {
-    # N lanes without the UART core (usplus_lanes_top.sv), filled from lane.edf
-    read_verilog -sv [list $here/usplus_lane_stub.sv $here/usplus_lanes_top.sv]
+    # N lanes without the UART core (usplus_lanes_top.sv), filled from lane.edf (made from the same commit)
+    set src [prov_snapshot $out [list $here/usplus_lane_stub.sv $here/usplus_lanes_top.sv]]
+    prov_write $out "usplus_lanes_top N=$n out of context, part $part, period $period ns, lanes from lane.edf"
+    if {![file exists $out/lane.edf] || [prov_id $out provenance_lane.txt] ne [prov_id $out] ||
+        [file mtime $out/lane.edf] < [file mtime $out/provenance_lane.txt]} {
+      error "provenance: lane.edf ([prov_id $out provenance_lane.txt]) is not from this commit ([prov_id $out]): run the lane stage again"
+    }
+    read_verilog -sv $src
     synth_design -top usplus_lanes_top -part $part -mode out_of_context -generic N=$n
   } else {
     # one lane in the batched harness (usplus_batch_top.sv)
-    read_decoder $rtl
-    read_verilog -sv [list $acorn/bench_lane.sv $acorn/uart_batch_core.sv $here/usplus_batch_top.sv]
+    set src [snapshot_decoder $rtl $out [list $acorn/bench_lane.sv $acorn/uart_batch_core.sv $here/usplus_batch_top.sv]]
+    prov_write $out "usplus_batch_top N=$n out of context, part $part, period $period ns"
+    read_verilog -sv $src
     set clk_hz [expr {int(round(1000.0 / $period)) * 1000000}]
     synth_design -top usplus_batch_top -part $part -mode out_of_context \
       -generic N=$n -generic FAST=2 -generic CLK_HZ=$clk_hz
@@ -72,7 +85,7 @@ if {$stage eq "synth" || $stage eq "all"} {
   if {$stage eq "synth"} { write_checkpoint -force $out/post_synth.dcp; return }
 }
 if {$stage eq "place" || $stage eq "all"} {
-  if {$stage eq "place"} { open_checkpoint $out/post_synth.dcp }
+  if {$stage eq "place"} { prov_stage $out $out/post_synth.dcp; open_checkpoint $out/post_synth.dcp }
   opt_design
   place_design -directive ExtraTimingOpt
   phys_opt_design -directive AggressiveExplore
@@ -80,7 +93,7 @@ if {$stage eq "place" || $stage eq "all"} {
   if {$stage eq "place"} { write_checkpoint -force $out/post_place.dcp; return }
 }
 if {$stage eq "route" || $stage eq "all"} {
-  if {$stage eq "route"} { open_checkpoint $out/post_place.dcp }
+  if {$stage eq "route"} { prov_stage $out $out/post_place.dcp; open_checkpoint $out/post_place.dcp }
   route_design -directive AggressiveExplore
   phys_opt_design -directive AggressiveExplore
   write_checkpoint -force $out/post_route.dcp
@@ -102,6 +115,7 @@ if {$stage eq "route" || $stage eq "all"} {
     if {$dec ne "" && $har ne ""} break
   }
   set fh [open $out/summary.txt w]
+  puts $fh [prov_id $out]
   puts $fh "part $part lanes $n period_ns $period"
   foreach {name p} [list overall [lindex $paths 0] decoder $dec harness $har] {
     if {$p eq ""} { puts $fh "$name none"; continue }

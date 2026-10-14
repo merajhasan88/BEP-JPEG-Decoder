@@ -23,6 +23,7 @@ at the same time (batched mode, see the last section).
 | `acorn_top.sv` | the Xilinx-specific part: 200 MHz differential input buffer, MMCM (1200 MHz VCO / `CLKOUT_DIV`), `BUFG`, and the `BUFGCE` that gates the decoder's clock |
 | `acorn.xdc` | pins: clock J19/H19 (DIFF_SSTL15), UART J2 (FPGA RX) / K2 (FPGA TX), LEDs G3 H3 G4 H4 |
 | `build.tcl` | Vivado non-project batch build |
+| `provenance.tcl` | what a build is made from (sourced by `build.tcl`, `build_batch.tcl` and the timing probes): every file the build reads, copied when it starts and checked against the commit checked out; `provenance.txt`; the commit in the bitstream's USERID |
 | `pi_bench.py` | host side (any Linux host with the UART; needs pyserial): sends files, prints one result line per file |
 | `sim/` | Verilator simulation of the whole harness (`uart_sim_top.sv` models the gated clock buffer, `tb_uart.cpp` sends files over the simulated UART) |
 | `make_expected.py` | expected results: libjpeg 9e checksums and RTL clock counts for this library, the other decoders' own simulations (and their accuracy against libjpeg 9e) |
@@ -59,6 +60,13 @@ vivado -mode batch -source build.tcl -tclargs <DUT> <CLKOUT_DIV> <out_dir>
 #   DUT 3 at 150 MHz needs VIVADO_EFFORT=high (stronger placement / routing): +0.013 ns; the default flow
 #   gives -0.10 ns (the one-symbol-per-clock Huffman loop is routing-bound)
 #   CLKOUT_DIV 8 = 150 MHz (this library, aq_djpeg), 13 = 92.3 MHz (core_jpeg); VIVADO_THREADS limits threads
+# Every build reads the commit checked out (provenance.tcl): it first copies each file it reads into <out_dir>/src
+# and checks the copy against the commit - a file that is not the commit's (edited, or not committed) stops the build,
+# BUILD_UNCOMMITTED=1 builds anyway, unstamped - then reads only the copies, and writes <out_dir>/provenance.txt
+# (commit, sha256 of every source and of the bitstream). The bitstream's USERID is the commit's first 8 hex digits:
+head -c 300 <out_dir>/acorn_dut3_div8.bit | strings | grep -o "UserID=[0-9A-FX]*"   # UserID=0XFFFFFFFF: unstamped
+# Build from a clean checkout of one commit (git worktree add --detach <dir> <commit>), not from a working tree that
+# is being edited: the separate stages of build_batch.tcl also check that their scripts are still the commit's.
 # load the bitstream into the FPGA's configuration RAM (not its flash), e.g. on the Pi:
 openFPGALoader --cable libgpiod --pins 10:9:11:8 acorn_dut0_div8.bit
 python3 pi_bench.py /dev/ttyAMA0 1000000 photo1.jpg photo2.jpg
