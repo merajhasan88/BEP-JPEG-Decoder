@@ -207,8 +207,8 @@ proc prov_stamp {out} {
 proc prov_bit {out bit} {
   lassign [prov::load $out] c s
   set fh [open $bit rb]; set h [read $fh 512]; close $fh
-  # Vivado 2026.1 writes the default as UserID=0XFFFFFFFF, a value set as UserID=2BDD7396 (leading zeros, if it drops
-  # them, restored)
+  # Vivado 2026.1 writes the default as UserID=0XFFFFFFFF, a value set as UserID=2BDD7396 and keeps leading zeros
+  # (UserID=008121AA); fewer digits would be padded
   if {![regexp {UserID=(?:0X)?([0-9A-F]{1,8})} $h -> uid]} { error "provenance: no UserID in the header of $bit" }
   set uid [string range "00000000$uid" end-7 end]
   set want FFFFFFFF; if {$s eq "committed"} { set want [string toupper [string range $c 0 7]] }
