@@ -1,7 +1,7 @@
-# provenance.tcl - what a Vivado build of this repository is made from (sourced by build.tcl, build_batch.tcl and
-# build_split.tcl). A build reads the commit checked out when it starts, never the files as they are later on: on
-# 2026-10-13 a build read the decoder's sources minutes after it started (build_split.tcl synthesizes the DDR3
-# controller first) while they were being edited, and its bitstream matched no commit.
+# provenance.tcl - what a Vivado build of this repository is made from (sourced by the Acorn build scripts and the
+# timing probes). A build reads the commit checked out when it starts, never the files as they are later on: on
+# 2026-10-13 a build read the decoder's sources minutes after it started, while they were being edited, and its
+# bitstream matched no commit.
 #
 #   prov_init <build script>     after sourcing this file: the repository (git) and the scripts that run the build
 #   prov_snapshot <out> <files> [-external]
