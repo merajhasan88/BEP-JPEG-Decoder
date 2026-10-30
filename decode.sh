@@ -1,5 +1,5 @@
 #!/bin/sh
-# decode.sh - decode JPEG files with BEBCL-JPEG's RTL in simulation (the SystemVerilog testbench
+# decode.sh - decode JPEG files with BEP-JPEG's RTL in simulation (the SystemVerilog testbench
 # tb/tb_jpeg.sv, run by tb/sim.sh) and report the decode time in clocks.  Needs a simulator
 # (Verilator 5.002 or later by default); no Python.
 #

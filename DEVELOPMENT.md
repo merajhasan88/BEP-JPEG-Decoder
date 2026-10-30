@@ -1,6 +1,6 @@
 # BEBCL-JPEG-development
 
-This branch is the full working tree behind the BEBCL-JPEG library. The `main` branch (the library) is
+This branch is the full working tree behind the BEP-JPEG library (called BEBCL-JPEG until 2026-10-30). The `main` branch (the library) is
 exported from it by `scripts/export_library.py` and is a strict subset, so every file of `main` is
 developed and verified here first.
 

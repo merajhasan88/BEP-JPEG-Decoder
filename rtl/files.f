@@ -1,4 +1,4 @@
-// BEBCL-JPEG: the decoder's source files in compile order (the package first). Top module: jpeg_decoder.
+// BEP-JPEG: the decoder's source files in compile order (the package first). Top module: jpeg_decoder.
 jpeg_pkg.sv
 jpeg_sdp_ram.sv
 jpeg_blockram.sv

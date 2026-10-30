@@ -60,9 +60,9 @@ power-saver comparison cite the runs of 2026-09-30 on the earlier image set (don
    2026-10-03 beats the fast CPU decoders on single-image time.** At a steady 3.9 GHz (the runs of
    2026-10-12 measured 3.40-3.93 GHz) one laptop core decodes a 12-megapixel photo in 27-62 ms with
    libjpeg-turbo -nosmooth, 30-81 ms with FFmpeg, 48-88 ms with zune-jpeg (Rust) and 54-92 ms with Pillow.
-   BEBCL-JPEG (`FAST=1`) takes 87-154 ms on the Artix-7 at 150 MHz (2.2-3.2x libjpeg-turbo
+   BEP-JPEG (`FAST=1`) takes 87-154 ms on the Artix-7 at 150 MHz (2.2-3.2x libjpeg-turbo
    -nosmooth's time) and 137-243 ms on the EP2C5 at 95 MHz; aq_djpeg 119-295 ms, core_jpeg 301-308 ms
-   (4:2:0 only). BEBCL-JPEG on the Artix-7 is faster than Go's `image/jpeg` (159-276 ms) on every
+   (4:2:0 only). BEP-JPEG on the Artix-7 is faster than Go's `image/jpeg` (159-276 ms) on every
    photo, than stb_image on 13 of 24 and than libjpeg 9e with its default upsampling on 20 of 24
    (20 and 16 of 24 in the run of 2026-10-04, which throttled to 2.3 GHz: these times are close, 81-145 ms
    for stb_image and 94-153 ms for libjpeg 9e against 87-154 ms). Per clock it does 8.1-11.8x more work than

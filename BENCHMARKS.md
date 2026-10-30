@@ -417,7 +417,7 @@ CPU: one core of the laptop's i7-8550U in the performance profile, single thread
 
 #### The owner's 12 photos (4:2:2, EXIF thumbnail)
 
-| photo | libjpeg-turbo -nosmooth | libjpeg-turbo | FFmpeg | zune-jpeg | Pillow | OpenCV | libjpeg 9e -nosmooth | stb_image | Go image/jpeg | **BEBCL-JPEG `FAST=2`** Artix-7 150 MHz | BEBCL-JPEG `FAST=1` Artix-7 150 MHz | BEBCL-JPEG `FAST=1` EP2C5 95 MHz | aq_djpeg Artix-7 150 MHz | core_jpeg Artix-7 92.3 MHz |
+| photo | libjpeg-turbo -nosmooth | libjpeg-turbo | FFmpeg | zune-jpeg | Pillow | OpenCV | libjpeg 9e -nosmooth | stb_image | Go image/jpeg | **BEP-JPEG `FAST=2`** Artix-7 150 MHz | BEP-JPEG `FAST=1` Artix-7 150 MHz | BEP-JPEG `FAST=1` EP2C5 95 MHz | aq_djpeg Artix-7 150 MHz | core_jpeg Artix-7 92.3 MHz |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | IMG20260405182829 | 61.6 | 63.8 | 74.6 | 85.7 | 91.7 | 97.6 | 133.8 | 142.5 | 264.3 | **45.6** | 139.4 | 220.1 | 271.1 | fails |
 | IMG20260405182833 | 62.2 | 61.0 | 77.0 | 84.6 | 89.2 | 100.6 | 133.0 | 138.4 | 265.7 | **47.3** | 143.5 | 226.6 | 280.5 | fails |
@@ -432,13 +432,13 @@ CPU: one core of the laptop's i7-8550U in the performance profile, single thread
 | IMG20260723160735 | 45.3 | 45.9 | 58.1 | 67.8 | 72.5 | 83.7 | 101.4 | 119.8 | 221.3 | **31.3** | 115.8 | 182.8 | 193.9 | fails |
 | adapter | 54.6 | 60.1 | 69.6 | 80.3 | 86.6 | 94.8 | 121.7 | 131.8 | 245.5 | **40.3** | 128.2 | 202.5 | 248.4 | fails |
 
-BEBCL-JPEG (`FAST=1`) on the Artix-7 takes 2.26-2.95x the time of libjpeg-turbo -nosmooth at 3.9 GHz per photo (2.26-2.95x that of the fastest CPU decoder on each photo); per clock it does 8.8-11.5x more work (1.18-1.78 clocks/pixel against libjpeg-turbo's 10.5-18.7 CPU clocks/pixel).
+BEP-JPEG (`FAST=1`) on the Artix-7 takes 2.26-2.95x the time of libjpeg-turbo -nosmooth at 3.9 GHz per photo (2.26-2.95x that of the fastest CPU decoder on each photo); per clock it does 8.8-11.5x more work (1.18-1.78 clocks/pixel against libjpeg-turbo's 10.5-18.7 CPU clocks/pixel).
 
-BEBCL-JPEG `FAST=2` (the wide core) on the Artix-7 at 150 MHz takes 0.65-0.79x the time of libjpeg-turbo -nosmooth at 3.9 GHz (1.26-1.54x faster) and 0.65-0.79x that of the fastest CPU decoder on each photo; 0.295-0.561 clocks/pixel.
+BEP-JPEG `FAST=2` (the wide core) on the Artix-7 at 150 MHz takes 0.65-0.79x the time of libjpeg-turbo -nosmooth at 3.9 GHz (1.26-1.54x faster) and 0.65-0.79x that of the fastest CPU decoder on each photo; 0.295-0.561 clocks/pixel.
 
 #### 4:2:0 re-encodes of the same photos (core_jpeg supports only 4:4:4 / 4:2:0)
 
-| photo | libjpeg-turbo -nosmooth | libjpeg-turbo | FFmpeg | zune-jpeg | Pillow | OpenCV | libjpeg 9e -nosmooth | stb_image | Go image/jpeg | **BEBCL-JPEG `FAST=2`** Artix-7 150 MHz | BEBCL-JPEG `FAST=1` Artix-7 150 MHz | BEBCL-JPEG `FAST=1` EP2C5 95 MHz | aq_djpeg Artix-7 150 MHz | core_jpeg Artix-7 92.3 MHz |
+| photo | libjpeg-turbo -nosmooth | libjpeg-turbo | FFmpeg | zune-jpeg | Pillow | OpenCV | libjpeg 9e -nosmooth | stb_image | Go image/jpeg | **BEP-JPEG `FAST=2`** Artix-7 150 MHz | BEP-JPEG `FAST=1` Artix-7 150 MHz | BEP-JPEG `FAST=1` EP2C5 95 MHz | aq_djpeg Artix-7 150 MHz | core_jpeg Artix-7 92.3 MHz |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | IMG20260405182829_420 | 44.5 | 45.0 | 52.4 | 66.7 | 71.2 | 84.9 | 99.3 | 99.8 | 205.9 | **32.9** | 101.5 | 160.3 | 189.9 | 301.0 |
 | IMG20260405182833_420 | 45.8 | 45.1 | 55.0 | 67.4 | 72.3 | 82.7 | 99.9 | 101.6 | 204.1 | **34.2** | 104.4 | 164.9 | 196.5 | 301.0 |
@@ -453,9 +453,9 @@ BEBCL-JPEG `FAST=2` (the wide core) on the Artix-7 at 150 MHz takes 0.65-0.79x t
 | IMG20260723160735_420 | 36.2 | 36.7 | 43.1 | 59.8 | 63.1 | 74.7 | 77.9 | 89.4 | 175.5 | **24.7** | 91.8 | 144.9 | 142.1 | 301.3 |
 | adapter_420 | 42.1 | 42.5 | 50.7 | 67.5 | 69.1 | 78.5 | 97.9 | 96.7 | 193.4 | **27.8** | 92.9 | 146.7 | 171.7 | 301.1 |
 
-BEBCL-JPEG (`FAST=1`) on the Artix-7 takes 2.21-3.21x the time of libjpeg-turbo -nosmooth at 3.9 GHz per photo (2.21-3.21x that of the fastest CPU decoder on each photo); per clock it does 8.1-11.8x more work (1.00-1.37 clocks/pixel against libjpeg-turbo's 8.1-14.7 CPU clocks/pixel).
+BEP-JPEG (`FAST=1`) on the Artix-7 takes 2.21-3.21x the time of libjpeg-turbo -nosmooth at 3.9 GHz per photo (2.21-3.21x that of the fastest CPU decoder on each photo); per clock it does 8.1-11.8x more work (1.00-1.37 clocks/pixel against libjpeg-turbo's 8.1-14.7 CPU clocks/pixel).
 
-BEBCL-JPEG `FAST=2` (the wide core) on the Artix-7 at 150 MHz takes 0.63-0.82x the time of libjpeg-turbo -nosmooth at 3.9 GHz (1.23-1.59x faster) and 0.64-0.82x that of the fastest CPU decoder on each photo; 0.255-0.417 clocks/pixel.
+BEP-JPEG `FAST=2` (the wide core) on the Artix-7 at 150 MHz takes 0.63-0.82x the time of libjpeg-turbo -nosmooth at 3.9 GHz (1.23-1.59x faster) and 0.64-0.82x that of the fastest CPU decoder on each photo; 0.255-0.417 clocks/pixel.
 
 ## Performance by image
 
@@ -611,9 +611,9 @@ power-saver comparison cite the runs of 2026-09-30 on the earlier image set (don
    2026-10-03 beats the fast CPU decoders on single-image time.** At a steady 3.9 GHz (the runs of
    2026-10-12 measured 3.40-3.93 GHz) one laptop core decodes a 12-megapixel photo in 27-62 ms with
    libjpeg-turbo -nosmooth, 30-81 ms with FFmpeg, 48-88 ms with zune-jpeg (Rust) and 54-92 ms with Pillow.
-   BEBCL-JPEG (`FAST=1`) takes 87-154 ms on the Artix-7 at 150 MHz (2.2-3.2x libjpeg-turbo
+   BEP-JPEG (`FAST=1`) takes 87-154 ms on the Artix-7 at 150 MHz (2.2-3.2x libjpeg-turbo
    -nosmooth's time) and 137-243 ms on the EP2C5 at 95 MHz; aq_djpeg 119-295 ms, core_jpeg 301-308 ms
-   (4:2:0 only). BEBCL-JPEG on the Artix-7 is faster than Go's `image/jpeg` (159-276 ms) on every
+   (4:2:0 only). BEP-JPEG on the Artix-7 is faster than Go's `image/jpeg` (159-276 ms) on every
    photo, than stb_image on 13 of 24 and than libjpeg 9e with its default upsampling on 20 of 24
    (20 and 16 of 24 in the run of 2026-10-04, which throttled to 2.3 GHz: these times are close, 81-145 ms
    for stb_image and 94-153 ms for libjpeg 9e against 87-154 ms). Per clock it does 8.1-11.8x more work than

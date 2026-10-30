@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Export the BEBCL-JPEG library (the `main` branch) from this development tree.
+"""Export the BEP-JPEG library (the `main` branch) from this development tree.
 
-BEBCL-JPEG is a subset of the development branch: the decoder, its tests, the board examples and the
+BEP-JPEG is a subset of the development branch: the decoder, its tests, the board examples and the
 benchmarks, without the development history (FAST_STATUS.md), the gate-level flows, the
 experimental Quartus projects and the owner's photos other than test_images/adapter.jpg.  Only
 files tracked by git here are exported, filtered by INCLUDE / EXCLUDE below; files in the target

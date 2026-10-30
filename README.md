@@ -1,6 +1,6 @@
-# BEBCL-JPEG Decoder
+# BEP-JPEG Decoder
 
-**B**it-**E**xact, **B**ackwards-**C**ompatible, **L**east clocks-per-pixel **JPEG** decoder: a streaming
+**B**it-**E**xact, **P**ortable **JPEG** decoder: a streaming
 baseline JPEG decoder for FPGAs, in SystemVerilog. JPEG bytes in, pixels out, with no processor and
 no frame buffer. It decodes baseline JPEG (ITU-T T.81 sequential DCT, Huffman coding, 8-bit
 samples), which is what cameras, phones and almost all software write.
@@ -8,15 +8,15 @@ samples), which is what cameras, phones and almost all software write.
 - **Bit-exact**: its pixels are identical to libjpeg 9e, or (one build option) to Pillow, OpenCV
   and libjpeg-turbo, on every test file and photo - for the supported formats (baseline 8-bit, grey /
   YCbCr / RGB, the libjpeg islow IDCT; see below); anything else is flagged in `err`.
-- **Backwards-compatible**: plain SystemVerilog in the subset that Quartus II 13.0sp1 accepts, with
+- **Portable**: plain SystemVerilog in the subset that Quartus II 13.0sp1 accepts, with
   no vendor primitives (RAMs and multipliers are inferred). The same RTL runs on a 2004 Intel/Altera
   Cyclone II (EP2C5, 4,608 logic elements) and a current Xilinx Artix-7, and builds with Quartus,
   Vivado and Yosys (Lattice ECP5).
-- **Least clocks per pixel** among the open-source FPGA JPEG decoders measured (below): 1.0-2.4
-  clocks per pixel for the fast core, 0.25-0.56 on phone photos for the wide core (`FAST=2`, up to four
-  pixels per output beat; how many per clock it reaches depends on the image, see "Performance by image"
-  in BENCHMARKS.md), which on an Artix-7 at 150 MHz decodes a 12-megapixel photo faster than any CPU
-  decoder on one laptop core.
+- **Speed**: 1.0-2.4 clocks per pixel for the fast core, 0.25-0.56 on phone photos for the wide core
+  (`FAST=2`, up to four pixels per output beat; how many per clock it reaches depends on the image, see
+  "Performance by image" in BENCHMARKS.md), which on an Artix-7 at 150 MHz decodes a 12-megapixel photo
+  faster than any CPU decoder on one laptop core; fewer clocks per pixel than the other open-source FPGA
+  JPEG decoders measured (below).
 
 Every build option is verified **bit for bit** against a reference decoder:
 
@@ -46,14 +46,14 @@ in **[BENCHMARKS.md](BENCHMARKS.md)** (Artix-7 details: `boards/acorn_cle215/REA
 Compared with the two other open-source FPGA JPEG decoders that could be measured, ultraembedded
 core_jpeg and H. Ishihara's aq_djpeg (same harness, same board, same files):
 
-- **Bit-exact.** BEBCL-JPEG's pixels are identical to libjpeg 9e, or with `RASTER_OUT=1
+- **Bit-exact.** BEP-JPEG's pixels are identical to libjpeg 9e, or with `RASTER_OUT=1
   FANCY_UPSAMPLE=1 CC_TURBO=1` to Pillow, OpenCV and libjpeg-turbo. Those of core_jpeg and
   aq_djpeg differ from libjpeg's by up to 4-14 levels on the photos (PSNR 41.6-46.8 dB) and by up
   to 32 on one small test file.
 - **Fewest clocks per pixel.** 0.25-0.56 for the wide core on the photos and 1.0-2.4 for the fast
   core, against 1.4-5.0 (aq_djpeg) and 2.1-3.3
   (core_jpeg, on the files it can decode). On the same Artix-7 board the others needed 1.4-2.1x
-  more clocks per photo, and BEBCL-JPEG has the highest Fmax of the three (160 MHz against 153
+  more clocks per photo, and BEP-JPEG has the highest Fmax of the three (160 MHz against 153
   and 95-104 MHz), so it decoded every photo fastest: 87-154 ms at 150 MHz, against 119-295 ms
   (aq_djpeg, 150 MHz) and about 301 ms (core_jpeg, 92.3 MHz, 4:2:0 copies only).
 - **Small enough for a 2004 FPGA.** The fast decoder fits the 4,608-LE Cyclone II EP2C5 with its 26
@@ -78,10 +78,10 @@ core_jpeg and H. Ishihara's aq_djpeg (same harness, same board, same files):
 
 Where the others are ahead: aq_djpeg uses fewer block RAMs (4 against 7.5 tiles) and DSP blocks
 (14 against 17), and its README says it can extract the first layer of a progressive JPEG (not
-tested here), which BEBCL-JPEG rejects; core_jpeg has a smaller build with fixed Huffman tables.
-"Least clocks per pixel" holds among open-source decoders: commercial cores claim more, e.g. CAST's
+tested here), which BEP-JPEG rejects; core_jpeg has a smaller build with fixed Huffman tables.
+Its lead in clocks per pixel holds among open-source decoders: commercial cores claim more, e.g. CAST's
 JPEG-DX-F decodes 2 to 32 colour samples per clock depending on its configuration, where
-BEBCL-JPEG's fast core decodes 1.1-1.7 on the photos and its wide core 3.6-6.8 (a 4:2:2 pixel is 2
+BEP-JPEG's fast core decodes 1.1-1.7 on the photos and its wide core 3.6-6.8 (a 4:2:2 pixel is 2
 samples, a 4:2:0 pixel 1.5).
 
 **Against CPU decoders** (one laptop core, CPU times rescaled to a steady 3.9 GHz, the laptop's best
@@ -116,7 +116,7 @@ run the decoder. All three simulate the same RTL cycle by cycle, write the decod
 | **Python** (`scripts/decode.py`, drives the C++ harness) | the above + Python 3 (Pillow optional) | `python3 scripts/decode.py` | `python3 scripts/decode.py --profile pillow --check` |
 
 ```sh
-git clone https://github.com/merajhasan88/BEBCL-JPEG-Decoder.git && cd BEBCL-JPEG-Decoder
+git clone https://github.com/merajhasan88/BEP-JPEG-Decoder.git && cd BEP-JPEG-Decoder
 cp ~/photos/*.jpg test_images/
 ./decode.sh                                   # or: ./decode.sh --sim xsim   (Vivado's simulator)
 ```
@@ -146,7 +146,7 @@ Options of `decode.sh` and `decode.py`:
 A file the decoder does not support (progressive, 12-bit, arithmetic coding ...) is reported with
 its error bits.
 
-## Using BEBCL-JPEG in your FPGA design
+## Using BEP-JPEG in your FPGA design
 
 Add the files of `rtl/` to your project (Quartus, Vivado, Yosys, ...; `rtl/files.f` lists them in
 compile order), instantiate `jpeg_decoder` and set the parameters below. `boards/` has complete examples:
@@ -380,11 +380,13 @@ Both regressions compare against the reference images in `tb/golden/` (made by t
 
 ## History
 
-BEBCL-JPEG grew out of Meraj Hasan's 2022 JPEG decoder in SystemVerilog, a simulation model written
+BEP-JPEG grew out of Meraj Hasan's 2022 JPEG decoder in SystemVerilog, a simulation model written
 from the ITU-T T.81 standard (marker parsing, quantisation and Huffman tables); those first
 commits are kept in this repository's history (tag `original-2023`). The synthesizable decoder,
 its tests and the board builds were developed from 2026 on; the full development history,
-including the timing-closure work on the EP2C5, is on the `BEBCL-JPEG-development` branch.
+including the timing-closure work on the EP2C5, is on the `BEBCL-JPEG-development` branch. Until
+2026-10-30 the project was called BEBCL-JPEG (Bit-Exact, Backwards-Compatible, Least clocks-per-pixel); the
+old name remains in that branch's name and in dated records.
 
 ## Acknowledgements
 
@@ -393,7 +395,7 @@ including the timing-closure work on the EP2C5, is on the `BEBCL-JPEG-developmen
 - The Independent JPEG Group (libjpeg) and the libjpeg-turbo project: the decoder's IDCT, colour
   conversion and upsampling arithmetic follow their code, and their decoders are the references.
 - ultraembedded (core_jpeg) and Hidemi Ishihara (aq_djpeg), whose open-source decoders made the
-  comparison possible; their code is not part of BEBCL-JPEG.
+  comparison possible; their code is not part of BEP-JPEG.
 - Verilator, Icarus Verilog, Yosys, sv2v and openFPGALoader, used to simulate, synthesize and load it.
 
 ## License
