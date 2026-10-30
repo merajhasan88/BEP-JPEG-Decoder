@@ -57,7 +57,7 @@ def measure(out):
     for f in sorted(glob.glob(os.path.join(REPO, "tb", "corpus", "*.jpg"))):
         b = os.path.basename(f)[:-4]
         if "UNSUPPORTED" in b or "_rgb" in b or "comtail" in b: continue   # RGB-coded (no colour conversion) and the
-                                                                            # 5,000-byte trailing comment: not comparable
+                                                                            # 4,900-byte trailing comment: not comparable
         h = header(f); h.update(file=b, kind="corpus", q=quality(f))
         for core, k in (("fmcu", "fast"), ("wmcu", "wide")):
             fs, cy = run(core, f); h[k] = dict(setup=fs, total=cy)

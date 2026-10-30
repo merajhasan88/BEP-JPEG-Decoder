@@ -115,7 +115,7 @@ def main():
         text = b"comment with ffd9 inside: \xff\xd9 !"
         com = b"\xff\xfe" + (len(text) + 2).to_bytes(2, "big") + text
         open(os.path.join(OUT_DIR, "adp_45x37_q30_422_exifthumb.jpg"), "wb").write(big[:2] + app1 + com + big[2:])
-        # a 5,000-byte COM after the scan, before the EOI (with FF D9 inside): the frame ends at the EOI
+        # a 4,900-byte COM after the scan, before the EOI (with FF D9 inside): the frame ends at the EOI
         small = open(os.path.join(OUT_DIR, "adp_16x16_q25_420.jpg"), "rb").read()
         tail = (b"a comment after the scan, with FF D9 inside: \xFF\xD9. " * 100)[:4998]
         open(os.path.join(OUT_DIR, "adp_16x16_q25_420_comtail.jpg"), "wb").write(
@@ -123,7 +123,7 @@ def main():
         rows.append(("adp_45x37_q30_422_exifthumb", ADAPTER, 45, 37, "fill", False,
                      "adp_45x37_q30_422 with an APP1 embedding adp_8x8_q10_gray and a COM containing FF D9"))
         rows.append(("adp_16x16_q25_420_comtail", ADAPTER, 16, 16, "fill", False,
-                     "adp_16x16_q25_420 with a 5,000-byte COM (containing FF D9) between its scan and its EOI"))
+                     "adp_16x16_q25_420 with a 4,900-byte COM (containing FF D9) between its scan and its EOI"))
     for rom in ("adp_64x64_q25_420", "board_352x32_q6_420"):
         n = os.path.getsize(os.path.join(OUT_DIR, rom + ".jpg"))
         if n > ROM_MAX: sys.exit(f"{rom}: {n} bytes, does not fit the {ROM_MAX}-byte board ROM")
