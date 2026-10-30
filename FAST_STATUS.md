@@ -437,7 +437,7 @@ those pixels differ from libjpeg's (they are to be discarded anyway; documented)
   xsim, all 10 EP2C5 builds re-fitted (LE counts unchanged except fpga_jtag 4,450, +0.33 ns), the
   three gate-level runs and the EP2C5 board (62/62, bench/board_jtag_95mhz_2026-10-04b.txt) pass.
 - **Git**: remote `origin` = github.com/merajhasan88/BEBCL-JPEG-Decoder (renamed by the owner from
-  jpegdecoder-systemverilog on 2026-10-04; main = the owner's 2022-23 work, tag `original-2023`); `main` (BEBCL-JPEG) sits on top of origin/main, so the push is a
+  jpegdecoder-systemverilog on 2026-10-04, and to BEP-JPEG-Decoder on 2026-10-30; main = the owner's 2022-23 work, tag `original-2023`); `main` (BEBCL-JPEG) sits on top of origin/main, so the push is a
   fast-forward. The remote-board client stays out of the repositories (owner's decision).
 
 ## 7f. 2026-10-10: the review of 2026-10-10 on the EP2C5

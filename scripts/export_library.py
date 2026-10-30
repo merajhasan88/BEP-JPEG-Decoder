@@ -8,7 +8,7 @@ files tracked by git here are exported, filtered by INCLUDE / EXCLUDE below; fil
 that git tracks in the target but are no longer exported are removed (untracked build outputs and
 its .git are left alone).
 
-usage: export_library.py <target folder>      (e.g. ../BEBCL-JPEG, a worktree of the main branch)
+usage: export_library.py <target folder>      (e.g. ../BEP-JPEG, a worktree of the main branch)
        export_library.py --list               (print what would be exported)"""
 import os, sys, shutil, fnmatch, subprocess
 
@@ -59,7 +59,7 @@ def exported():
 def main():
     if len(sys.argv) != 2: sys.exit(__doc__)
     # only the development branch is exported: work in progress on other branches (Proposals A and B
-    # on proposals-AB, in the worktree ../BEBCL-JPEG-proposals) must not reach main by accident
+    # on proposals-AB) must not reach main by accident
     branch = subprocess.run(["git", "-C", DEV, "rev-parse", "--abbrev-ref", "HEAD"],
                             capture_output=True, text=True, check=True).stdout.strip()
     if branch != "BEP-JPEG-development":

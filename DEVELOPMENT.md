@@ -27,8 +27,8 @@ cd tb && make && make test                      # 1,818 + 90 + 468 runs must pas
 python3 export_expectations.py                  # refresh expected.txt etc. for run_tests.sh when the
 ./run_tests.sh                                  #   corpus or the configurations change; same 2,376 runs
 git add -A && git commit                        # on BEP-JPEG-development
-python3 scripts/export_library.py ../BEBCL-JPEG        # ../BEBCL-JPEG is the worktree of main
-cd ../BEBCL-JPEG && git add -A && git commit
+python3 scripts/export_library.py ../BEP-JPEG          # ../BEP-JPEG: a worktree of main
+cd ../BEP-JPEG && git add -A && git commit
 ```
 After RTL changes also re-fit the EP2C5 builds (`boards/ep2c5/compile_all.sh`): `fpga_raster` uses
 99 % of the device, so any growth on the raster path can break it. After changes to a core's timing,
