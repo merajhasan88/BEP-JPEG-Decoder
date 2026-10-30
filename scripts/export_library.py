@@ -62,9 +62,9 @@ def main():
     # on proposals-AB, in the worktree ../BEBCL-JPEG-proposals) must not reach main by accident
     branch = subprocess.run(["git", "-C", DEV, "rev-parse", "--abbrev-ref", "HEAD"],
                             capture_output=True, text=True, check=True).stdout.strip()
-    if branch != "BEBCL-JPEG-development":
+    if branch != "BEP-JPEG-development":
         sys.exit(f"export_library.py: this checkout is on branch {branch!r}; the library is exported from "
-                 "branch BEBCL-JPEG-development only")
+                 "branch BEP-JPEG-development only")
     files = exported()
     if sys.argv[1] == "--list":
         print("\n".join(files)); return

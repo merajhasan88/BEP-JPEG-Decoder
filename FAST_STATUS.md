@@ -386,7 +386,7 @@ those pixels differ from libjpeg's (they are to be discarded anyway; documented)
 - **Vivado lint** found two signals used before their declaration (`jpeg_dec_small.sv` skip_idct,
   `jpeg_raster_fast.sv` pbase_r): declarations moved up; Verilator lint with IMPLICIT warnings clean.
 - **BEBCL-JPEG** (owner, 2026-10-04; renamed BEP-JPEG, Bit-Exact Portable, by the owner on 2026-10-30): the library is named BEBCL-JPEG; `main` = the library, this tree =
-  branch `BEBCL-JPEG-development` (was `claude_jpeg/`). Layout: `rtl/` holds only the decoder; the
+  branch `BEBCL-JPEG-development` (`BEP-JPEG-development` since 2026-10-30; was `claude_jpeg/`). Layout: `rtl/` holds only the decoder; the
   EP2C5 tops, Quartus projects, host scripts and board simulations moved to `boards/ep2c5/`
   (gate-level flows to `boards/ep2c5/gate_level/`); `quartus/` keeps `core` and `fpga_fast_raster`.
   Test files are made from `test_images/adapter.jpg` only (the 14 files made from screen photos were

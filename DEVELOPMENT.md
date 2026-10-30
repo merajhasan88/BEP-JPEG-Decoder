@@ -1,4 +1,4 @@
-# BEBCL-JPEG-development
+# BEP-JPEG-development
 
 This branch is the full working tree behind the BEP-JPEG library (called BEBCL-JPEG until 2026-10-30). The `main` branch (the library) is
 exported from it by `scripts/export_library.py` and is a strict subset, so every file of `main` is
@@ -26,7 +26,7 @@ developed and verified here first.
 cd tb && make && make test                      # 1,818 + 90 + 468 runs must pass (9 configurations)
 python3 export_expectations.py                  # refresh expected.txt etc. for run_tests.sh when the
 ./run_tests.sh                                  #   corpus or the configurations change; same 2,376 runs
-git add -A && git commit                        # on BEBCL-JPEG-development
+git add -A && git commit                        # on BEP-JPEG-development
 python3 scripts/export_library.py ../BEBCL-JPEG        # ../BEBCL-JPEG is the worktree of main
 cd ../BEBCL-JPEG && git add -A && git commit
 ```
