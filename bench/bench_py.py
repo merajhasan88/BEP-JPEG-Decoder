@@ -33,8 +33,9 @@ while len(per) < 64 and (time.perf_counter() - ts < min_s or len(per) < 5):
     a = time.perf_counter()
     for _ in range(per_batch): dec()
     per.append((time.perf_counter() - a) / per_batch); total += per_batch
-e1 = rapl(); per.sort(); med = per[len(per) // 2]
+e1 = rapl(); seq = list(per); per.sort(); med = per[len(per) // 2]
 uj = (e1 - e0) / total if e0 >= 0 and e1 >= e0 else -1
 if not W:
     from PIL import Image; W, H = Image.open(io.BytesIO(data)).size
 print(f"{W}x{H} ms={med*1e3:.4f} mpx_s={W*H/med/1e6:.2f} decodes={total} elapsed={time.perf_counter()-ts:.2f} uJ_per_decode={uj:.1f}")
+print(f"per_batch={per_batch} batches_ms=" + ",".join(f"{v*1e3:.4f}" for v in seq))   # every batch, measured order

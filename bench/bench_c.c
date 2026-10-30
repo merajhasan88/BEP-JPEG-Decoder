@@ -4,7 +4,9 @@
  * usage: bench_xxx file.jpg [mode] [min_seconds]
  *   mode (libjpeg): fancy (default: islow + fancy upsampling), nosmooth, ifast
  * Prints: median ms per decode over batches, Mpixel/s, and package energy per decode (RAPL)
- * when /sys/class/powercap/intel-rapl:0/energy_uj is readable.                          */
+ * when /sys/class/powercap/intel-rapl:0/energy_uj is readable; then a second line with every
+ * batch's ms per decode in the order measured (the spread; one warm-up decode and a 0.05 s
+ * calibration come first, batches of ~0.1 s, at least min_seconds and 5 batches, at most 64).  */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -64,9 +66,13 @@ int main(int argc, char **argv) {
         per[nb++] = (b - a) / per_batch; total += per_batch;
     }
     long long e1 = rapl(); double elapsed = now() - tstart;
+    double seq[NB]; memcpy(seq, per, sizeof(double) * nb);           /* measured order, for the spread */
     qsort(per, nb, sizeof(double), cmpd);
     double med = per[nb / 2];
     double uj = (e0 >= 0 && e1 >= e0) ? (double)(e1 - e0) / total : -1;
     printf("%dx%d ms=%.4f mpx_s=%.2f decodes=%ld elapsed=%.2f uJ_per_decode=%.1f\n", W, H, med * 1e3, W * (double)H / med / 1e6, total, elapsed, uj);
+    printf("per_batch=%d batches_ms=", per_batch);
+    for (int i = 0; i < nb; i++) printf(i ? ",%.4f" : "%.4f", seq[i] * 1e3);
+    printf("\n");
     return 0;
 }

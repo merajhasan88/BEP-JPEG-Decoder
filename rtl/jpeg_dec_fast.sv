@@ -70,6 +70,7 @@ module jpeg_dec_fast #(
   logic [9:0]  lut_waddr;
   logic [11:0] lut_wdata;
   logic [1:0]  nf, ns;
+  logic        cs_rgb;           // RGB image (parser): no colour conversion
   logic [11:0] comp_h, comp_v;
   logic [7:0]  comp_tq, scan_ci;
   logic [3:0]  scan_td, scan_ta;
@@ -91,7 +92,7 @@ module jpeg_dec_fast #(
     .hc_we(hc_we), .hc_waddr(hc_waddr), .hc_wdata(hc_wdata),
     .hv_we(hv_we), .hv_waddr(hv_waddr), .hv_wdata(hv_wdata),
     .lut_we(lut_we), .lut_waddr(lut_waddr), .lut_wdata(lut_wdata),
-    .img_w(img_w), .img_h(img_h), .nf(nf), .comp_h(comp_h), .comp_v(comp_v), .comp_tq(comp_tq),
+    .img_w(img_w), .img_h(img_h), .nf(nf), .cs_rgb(cs_rgb), .comp_h(comp_h), .comp_v(comp_v), .comp_tq(comp_tq),
     .ns(ns), .scan_ci(scan_ci), .scan_td(scan_td), .scan_ta(scan_ta), .ri(ri), .scan_start(scan_start),
     .tok_valid(tok_valid), .tok_data(tok_data), .tok_ready(tok_ready),
     .eoi(eoi), .soi(p_soi), .err_set(err_set));
@@ -257,13 +258,14 @@ module jpeg_dec_fast #(
         S_IDLE: if (scan_start) begin
           decoding <= 1'b1; frame_start <= 1'b1; eoi_seen <= 1'b0;
           if (img_w == 16'd0 || img_h == 16'd0) err[ERR_FRAME] <= 1'b1;   // X or Y = 0 (DNL), or no SOF
-          if (img_w == 16'd0 || img_h == 16'd0 || (hdr_err_mask & (err_set | err)) != 13'd0) begin
+          if (cs_rgb && out_fmt != FMT_RGB) err[ERR_SOF_TYPE] <= 1'b1;     // an RGB image: RGB output only
+          if (img_w == 16'd0 || img_h == 16'd0 || (hdr_err_mask & (err_set | err)) != 13'd0 || (cs_rgb && out_fmt != FMT_RGB)) begin
             skip_img <= 1'b1; state <= S_DRAIN;               // no pixels: consume the image's scans
           end else state <= S_SETUP;
         end
         S_SETUP: begin
           gray   <= (nf == 2'd1);
-          fmt_r  <= out_fmt;
+          fmt_r  <= cs_rgb ? FMT_YCBCR : out_fmt;   // RGB image: no colour conversion
           nstore <= ((nf == 2'd1) || (out_fmt == FMT_Y)) ? 2'd1 : 2'd3;
           hmax2  <= hmax2_c; vmax2 <= vmax2_c;
           mcu_w  <= hmax2_c ? 16'd16 : 16'd8;
@@ -353,15 +355,20 @@ module jpeg_dec_fast #(
           if (restart_done) begin
             restart_req <= 1'b0;
             if (br_at_end) begin
-              if (skip_img) begin br_clear <= 1'b1; state <= S_SKIP; end
-              else state <= S_DONE;
+              br_clear <= 1'b1; state <= S_SKIP;          // then the rest of the image, up to its EOI
             end
           end
         end
-        // an unusable image (e.g. progressive) may have more scans: consume them all, and end the
-        // frame once, at the image's EOI
+        // after the scan: consume the rest of the image (e.g. a COM segment after the scan) and end
+        // the frame once, at its EOI - or at the EOI the parser appends when in_last comes first
+        // (ERR_TRUNC), so frame_done always carries the image's final error.  An unusable image
+        // (e.g. progressive) may have more scans: drain them; a second scan after a decoded one is
+        // not supported (ERR_SCAN).
         S_SKIP: if (eoi_seen || eoi) begin skip_img <= 1'b0; state <= S_DONE; end
-                else if (scan_start) state <= S_DRAIN;
+                else if (scan_start) begin
+                  if (!skip_img) err[ERR_SCAN] <= 1'b1;
+                  skip_img <= 1'b1; state <= S_DRAIN;
+                end
         S_DONE: if (out_fin && !id_busy && out_idle) begin      // wait for the last pixel
           frame_done <= 1'b1; decoding <= 1'b0; br_clear <= 1'b1; state <= S_IDLE;
         end

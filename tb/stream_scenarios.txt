@@ -4,3 +4,12 @@ adp_40x40_q20_sof1_UNSUPPORTED adp_32x32_q25_420|an unsupported SOF1 file does n
 adp_45x37_q30_progressive_UNSUPPORTED adp_17x33_q40_420|an unsupported progressive file does not block the next image
 adp_13x11_q40_gray adp_32x32_q25_444 adp_40x50_q30_420_rst3 adp_45x37_q30_422_exifthumb|grey, 4:4:4, 4:2:0 with restarts, 4:2:2 with EXIF, back to back
 adp_64x64_q25_420 adp_64x64_q25_420|the same image twice
+adp_16x16_q25_420_comtail adp_32x32_q25_420|a comment after the scan: the frame ends at its EOI
+malformed/com_after_scan_no_eoi adp_32x32_q25_420|a file ending inside a comment after its scan (no EOI), then a valid image
+malformed/dri_len0 adp_17x33_q40_420|a DRI of length 0, then a valid image
+malformed/seg_c0_len1 adp_32x32_q25_420|an SOF of length 1, then a valid image
+malformed/dup_ci_sof_and_sos adp_32x32_q25_420|component ids repeated in SOF and SOS, then a valid image
+malformed/ac_symbol_10 adp_32x32_q25_420|an illegal AC symbol, then a valid image
+malformed/lse_colour_transform adp_32x32_q25_420|a libjpeg 9 colour transform (LSE), then a valid image
+adp_32x32_q25_420 adp_32x24_q50_rgb adp_17x33_q40_420|an RGB-coded image between two YCbCr images
+trail_adp_32x32_q25_420 adp_17x33_q40_420|bytes after the EOI (a camera's trailer: zeros, FF fill, a stray FF D9, text) leave the frame's err alone

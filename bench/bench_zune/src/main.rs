@@ -50,9 +50,12 @@ fn main() {
     }
     let e1 = rapl();
     let elapsed = tstart.elapsed().as_secs_f64();
+    let seq = per.clone(); // every batch in the order measured, for the spread
     per.sort_by(|a, b| a.partial_cmp(b).unwrap());
     let med = per[per.len() / 2];
     let uj = if e0 >= 0 && e1 >= e0 { (e1 - e0) as f64 / total as f64 } else { -1.0 };
     println!("{}x{} ms={:.4} mpx_s={:.2} decodes={} elapsed={:.2} uJ_per_decode={:.1}",
              w, h, med * 1e3, (w * h) as f64 / med / 1e6, total, elapsed, uj);
+    let list: Vec<String> = seq.iter().map(|v| format!("{:.4}", v * 1e3)).collect();
+    println!("per_batch={} batches_ms={}", per_batch, list.join(","));
 }

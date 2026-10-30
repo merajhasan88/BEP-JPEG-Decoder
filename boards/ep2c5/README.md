@@ -19,18 +19,18 @@ Every build includes the full header/table validation (`CHECKS=1`) and the 13-bi
 
 | project | options | LEs | M4K | Fmax | row buffer / max width |
 |---|---|---:|---:|---:|---|
-| `fpga` | compact core, MCU order, replication, RGB (= djpeg 9e) | 3,374 (73 %) | 9 | 61.3 MHz | none needed / any |
-| `fpga_raster_box` | compact, raster, replication, RGB | 4,089 (89 %) | 25 | 64.6 MHz | 9,216 B / 4:2:0 384 px |
-| `fpga_raster_ycc` | compact, raster, Pillow smoothing, YCbCr only | 4,454 (97 %) | 25 | 59.6 MHz | 9,216 B / 4:2:0 352 px |
-| `fpga_raster` | compact, raster, Pillow smoothing, RGB (= Pillow) | 4,547 (99 %) | 25 | 59.6 MHz | 9,216 B / 4:2:0 352 px |
+| `fpga` | compact core, MCU order, replication, RGB (= djpeg 9e) | 3,460 (75 %) | 9 | 60.2 MHz | none needed / any |
+| `fpga_raster_box` | compact, raster, replication, RGB | 4,127 (90 %) | 25 | 60.2 MHz | 9,216 B / 4:2:0 384 px |
+| `fpga_raster_ycc` | compact, raster, Pillow smoothing, YCbCr only | 4,480 (97 %) | 25 | 60.9 MHz | 9,216 B / 4:2:0 352 px |
+| `fpga_raster` | compact, raster, Pillow smoothing, RGB (= Pillow) | 4,566 (99 %) | 25 | 58.8 MHz | 9,216 B / 4:2:0 352 px |
 
 Fast core (`FAST=1`), MCU order, replication, RGB:
 
 | project | clock | LEs | memory | timing |
 |---|---|---:|---:|---|
-| `fpga_jtag` | **95 MHz from the PLL**; the JPEG is streamed in over the USB-Blaster (virtual JTAG), the decoder clock only runs while its next byte is waiting, so the on-chip clock count is the decode time without streaming time | 4,425 (96 %) | 59,712 bits | met at 95 MHz, +0.39 ns setup, +0.50 ns hold (Fmax 98.7 MHz); PowerPlay ~147 mW |
-| `fpga_fast_bench` | **95 MHz from the PLL** (`PLL_MUL=19`, `PLL_DIV=10`), `BENCH=1` (decodes at full speed, reports the clock count over UART) | 4,368 (95 %) | 63,808 bits | met at 95 MHz, +0.13 ns (Fmax 96.2 MHz); PowerPlay ~151 mW |
-| `fpga_fast` | 50 MHz, pixels over UART like `fpga` (the board demo) | 4,296 (93 %) | 63,808 bits | met at 50 MHz, +6.18 ns (Fmax 72.4 MHz) |
+| `fpga_jtag` | **95 MHz from the PLL**; the JPEG is streamed in over the USB-Blaster (virtual JTAG), the decoder clock only runs while its next byte is waiting, so the on-chip clock count is the decode time without streaming time | 4,470 (97 %) | 59,712 bits | met at 95 MHz, +0.38 ns setup, +0.50 ns hold (Fmax 98.6 MHz; re-fit 2026-10-12); PowerPlay ~147 mW (2026-10-04) |
+| `fpga_fast_bench` | **95 MHz from the PLL** (`PLL_MUL=19`, `PLL_DIV=10`), `BENCH=1` (decodes at full speed, reports the clock count over UART) | 4,401 (96 %) | 63,808 bits | met at 95 MHz, +0.72 ns (Fmax 101.9 MHz); PowerPlay ~151 mW (2026-10-04) |
+| `fpga_fast` | 50 MHz, pixels over UART like `fpga` (the board demo) | 4,372 (95 %) | 63,808 bits | met at 50 MHz, +4.72 ns (Fmax 65.4 MHz) |
 
 The compact builds meet timing at 50 MHz. What made the largest build fit: the Huffman symbol
 table folded into one M4K, the coefficient buffer zeroed during the IDCT's second pass, the
@@ -47,7 +47,9 @@ python3 ../scripts/jtag_decode.py photo.jpg ...    # stream each file, read deco
 #   the reference checksum comes from libjpeg 9e (bench/tools.py builds it; or --djpeg PATH)
 cd ../fpga_raster && quartus_sh --flow compile jpeg_fpga_raster                          # UART demo
 quartus_pgm -m jtag -o "p;output_files/jpeg_fpga_raster.sof"
-./compile_all.sh                                   # every project, one after another
+./compile_all.sh [project ...]                     # every project (or those named), one after another; each
+#   compiles the commit checked out: no modified tracked file before or after the compile, every file its .qsf
+#   names committed (else not compiled); output_files/provenance.txt records the commit and the files' sha256
 ```
 
 On the board (2026-10-01 and 2026-10-04, `fpga_jtag` at 95 MHz): every test photo decodes with libjpeg's checksum

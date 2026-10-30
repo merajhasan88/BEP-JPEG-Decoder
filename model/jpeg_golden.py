@@ -109,6 +109,19 @@ FIX_1_961570560, FIX_2_053119869, FIX_2_562915447, FIX_3_072711026 = 16069, 1681
 RANGE_CENTER = 128 << 2          # RANGE_BITS = 2
 RANGE_MASK = RANGE_CENTER*2 - 1  # 1023
 
+# The decoder's documented 16-bit limits (rtl/jpeg_coefdec.sv, jpeg_huffdec*.sv, jpeg_idct*.sv): the
+# dequantised coefficient and the IDCT's pass-1 workspace saturate to 16 bits, where libjpeg keeps an int.
+# Images from 8-bit sources never reach these limits (all test images: SAT[0] stays 0), so the model is
+# libjpeg 9e's arithmetic for them; for synthetic extreme files (tb/make_arith.py) it is the decoder's.
+SAT = [0]                        # saturations so far (Decoder.run resets it; Decoder.saturations)
+def sat16(v):
+    if v > 32767: SAT[0] += 1; return 32767
+    if v < -32768: SAT[0] += 1; return -32768
+    return v
+def wrap16(v):
+    """(JCOEF) s of libjpeg's decode_mcu = the decoder's 16-bit DC predictor"""
+    return ((v + 32768) & 0xFFFF) - 32768
+
 def range_limit(v):
     """IDCT_range_limit[(v) & RANGE_MASK] of libjpeg 9 (sample_range_limit - RANGE_SUBSET)."""
     v &= RANGE_MASK
@@ -150,7 +163,7 @@ def idct_islow(coef):
         z3 = x[4] << CONST_BITS
         out = idct_1d_core(x[0], x[1], x[2], x[3], x[4], x[5], x[6], x[7], z2, z3)
         for r in range(8):
-            ws[8*r + c] = out[r] >> (CONST_BITS - PASS1_BITS)
+            ws[8*r + c] = sat16(out[r] >> (CONST_BITS - PASS1_BITS))   # the decoder's 16-bit workspace
     res = [0]*64
     for r in range(8):                          # pass 2: rows
         w = ws[8*r:8*r+8]
@@ -268,8 +281,13 @@ class Decoder:
         self.upsample, self.cc, self.out, self.crosscheck = upsample, cc, out, crosscheck
         self.qt = {}; self.dc = {}; self.ac = {}; self.ri = 0
         self.frame = None; self.nblocks_dumped = 0
+        self.saw_jfif = self.saw_adobe = False; self.adobe_transform = None   # libjpeg examine_app0/app14
     def u16(self, p): return (self.data[p] << 8) | self.data[p+1]
     def run(self):
+        SAT[0] = 0
+        try: return self._run()
+        finally: self.saturations = SAT[0]
+    def _run(self):
         d = self.data; p = 0
         assert d[0] == 0xFF and d[1] == 0xD8, "no SOI"; p = 2
         while True:
@@ -284,6 +302,11 @@ class Decoder:
             elif m in (0xC1,0xC2,0xC3,0xC5,0xC6,0xC7,0xC9,0xCA,0xCB,0xCD,0xCE,0xCF):
                 raise ValueError("unsupported SOF type FF%02X (only baseline SOF0)" % m)
             elif m == 0xDD: self.ri = self.u16(p+2)
+            elif m == 0xE0 and len(seg) >= 14 and seg[:5] == b"JFIF\0": self.saw_jfif = True
+            elif m == 0xEE and len(seg) >= 12 and seg[:5] == b"Adobe":
+                self.saw_adobe = True; self.adobe_transform = seg[11]
+            elif m == 0xF8:
+                raise ValueError("unsupported: LSE marker (libjpeg 9 colour transform)")
             elif m == 0xDA:
                 p = self.decode_scan(seg, p + L); continue
             # APPn, COM, DNL, etc: skip
@@ -325,7 +348,7 @@ class Decoder:
         zz = [0]*64
         t, l, code = huff_decode(br, comp['dct'])
         diff = extend(br.bits(t), t) if t else 0
-        pred += diff; zz[0] = pred
+        pred = wrap16(pred + diff); zz[0] = pred
         k = 1
         while k < 64:
             rs, l, code = huff_decode(br, comp['act'])
@@ -338,7 +361,7 @@ class Decoder:
             zz[k] = extend(br.bits(s), s); k += 1
         q = self.qt[comp['tq']]
         coef = [0]*64
-        for k in range(64): coef[ZIGZAG[k]] = zz[k] * q[ZIGZAG[k]]
+        for k in range(64): coef[ZIGZAG[k]] = sat16(zz[k] * q[ZIGZAG[k]])   # dequantised, 16-bit as in the decoder
         samp = idct_islow(coef)
         if self.dump is not None and (self.maxblocks is None or self.nblocks_dumped < self.maxblocks):
             self.dump.write("BLOCK mcu=%d n=%d comp=%d bx=%d by=%d dcpred=%d\n" % (mcu_no, blk_no, comp['id'], bx, by, pred))
@@ -391,12 +414,29 @@ class Decoder:
         while not (self.data[p] == 0xFF and self.data[p+1] != 0 and not (0xD0 <= self.data[p+1] <= 0xD7)): p += 1
         return p
 
+    def colour_space(self):
+        """libjpeg 9e jdapimin.c default_decompress_parms for 3 components: component IDs first, then the
+        JFIF APP0, then the Adobe APP14 transform; 'ycc' or 'rgb' (big-gamut IDs are not supported)"""
+        comps = self.frame['comps']
+        if len(comps) != 3: return 'ycc'
+        ids = tuple(c['id'] for c in comps)
+        if ids == (1, 2, 3): return 'ycc'
+        if ids in ((1, 0x22, 0x23), (0x72, 0x67, 0x62)):
+            raise ValueError("unsupported: libjpeg 9 big-gamut colour space (component IDs %r)" % (ids,))
+        if ids == (0x52, 0x47, 0x42): return 'rgb'
+        if self.saw_jfif: return 'ycc'
+        if self.saw_adobe and self.adobe_transform == 0: return 'rgb'
+        return 'ycc'
+
     def output(self):
         """rgb  : P6 R,G,B (grey images: P5 Y, like djpeg)
            ycbcr: P6 Y,Cb,Cr after upsampling, no colour conversion (grey images: Y,128,128)
            y    : P5 luma only (component 0), chroma never needed"""
         f = self.frame; W, H = f['W'], f['H']; comps = f['comps']
         hmax, vmax = f['hmax'], f['vmax']
+        rgb = self.colour_space() == 'rgb'
+        if rgb and self.out != 'rgb':
+            raise ValueError("unsupported: %s output of an RGB image (the decoder gives RGB only)" % self.out)
         use = comps[:1] if (self.out == 'y' or len(comps) == 1) else comps
         assert len(comps) in (1, 3), "only 1- or 3-component images"
         planes = []
@@ -414,7 +454,7 @@ class Decoder:
         n = W * H; out = bytearray(3 * n)
         if len(planes) == 1:                                     # grey image, ycbcr output
             out[0::3] = planes[0]; out[1::3] = bytes([128]) * n; out[2::3] = bytes([128]) * n
-        elif self.out == 'ycbcr':
+        elif self.out == 'ycbcr' or rgb:                         # an RGB image: its components as they are
             out[0::3], out[1::3], out[2::3] = planes[0], planes[1], planes[2]
         else:
             conv = make_ycc_to_rgb(self.cc)

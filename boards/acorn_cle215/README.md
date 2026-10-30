@@ -23,6 +23,7 @@ at the same time (batched mode, see the last section).
 | `acorn_top.sv` | the Xilinx-specific part: 200 MHz differential input buffer, MMCM (1200 MHz VCO / `CLKOUT_DIV`), `BUFG`, and the `BUFGCE` that gates the decoder's clock |
 | `acorn.xdc` | pins: clock J19/H19 (DIFF_SSTL15), UART J2 (FPGA RX) / K2 (FPGA TX), LEDs G3 H3 G4 H4 |
 | `build.tcl` | Vivado non-project batch build |
+| `provenance.tcl` | what a build is made from (sourced by `build.tcl`, `build_batch.tcl` and the timing probes): every file the build reads, copied when it starts and checked against the commit checked out; `provenance.txt`; the commit in the bitstream's USERID |
 | `pi_bench.py` | host side (any Linux host with the UART; needs pyserial): sends files, prints one result line per file |
 | `sim/` | Verilator simulation of the whole harness (`uart_sim_top.sv` models the gated clock buffer, `tb_uart.cpp` sends files over the simulated UART) |
 | `make_expected.py` | expected results: libjpeg 9e checksums and RTL clock counts for this library, the other decoders' own simulations (and their accuracy against libjpeg 9e) |
@@ -39,7 +40,10 @@ whole file has arrived until the frame is done. So at every decoder clock the in
 and `clocks` is the decode time with an ideal input, independent of the UART speed; it equals
 the cycle-exact simulation (`tb/` for this library, `bench/others/tb_other.cpp` for the others).
 The checksum is the sum over all pixels of `{(x ^ y)[7:0], R, G, B}` mod 2^32, as on the EP2C5
-boards, so it does not depend on the pixel order. A decoder that stalls is ended after 2^26 of its
+boards, so it does not depend on the pixel order. It binds the pixel count and catches most errors,
+but not colours exchanged between positions (the position and colour terms add separately); the
+pixel-by-pixel comparison with libjpeg 9e is the simulation of the same files, whose clock counts the
+board reproduces. New harnesses use a position-binding hash and read whole images back. A decoder that stalls is ended after 2^26 of its
 clocks without a pixel (flag `watchdog`), so the next file still runs.
 
 Protocol (8N1): host to FPGA `55 AA 'J' 'P' len[31:0]` (big-endian) and the file; FPGA to host,
@@ -56,6 +60,13 @@ vivado -mode batch -source build.tcl -tclargs <DUT> <CLKOUT_DIV> <out_dir>
 #   DUT 3 at 150 MHz needs VIVADO_EFFORT=high (stronger placement / routing): +0.013 ns; the default flow
 #   gives -0.10 ns (the one-symbol-per-clock Huffman loop is routing-bound)
 #   CLKOUT_DIV 8 = 150 MHz (this library, aq_djpeg), 13 = 92.3 MHz (core_jpeg); VIVADO_THREADS limits threads
+# Every build reads the commit checked out (provenance.tcl): it first copies each file it reads into <out_dir>/src
+# and checks the copy against the commit - a file that is not the commit's (edited, or not committed) stops the build,
+# BUILD_UNCOMMITTED=1 builds anyway, unstamped - then reads only the copies, and writes <out_dir>/provenance.txt
+# (commit, sha256 of every source and of the bitstream). The bitstream's USERID is the commit's first 8 hex digits:
+head -c 300 <out_dir>/acorn_dut3_div8.bit | strings | grep -o "UserID=[0-9A-FX]*"   # UserID=0XFFFFFFFF: unstamped
+# Build from a clean checkout of one commit (git worktree add --detach <dir> <commit>), not from a working tree that
+# is being edited: the separate stages of build_batch.tcl also check that their scripts are still the commit's.
 # load the bitstream into the FPGA's configuration RAM (not its flash), e.g. on the Pi:
 openFPGALoader --cable libgpiod --pins 10:9:11:8 acorn_dut0_div8.bit
 python3 pi_bench.py /dev/ttyAMA0 1000000 photo1.jpg photo2.jpg
@@ -120,9 +131,9 @@ What the runs show:
 - **The wide core (`FAST=2`, DUT 3, run on 2026-10-04) decoded all 24 files with pixels identical to
   libjpeg 9e** at 0.295-0.561 clocks/pixel on the 4:2:2 originals and 0.255-0.417 on the 4:2:0 copies,
   3.0-4.0x fewer clocks than the fast core: 22.0-48.6 ms per 12-megapixel photo at 150 MHz. Every
-  clock count equals the cycle-exact simulation. That is 0.64-0.80x the time of libjpeg-turbo
-  -nosmooth on one laptop core at 3.9 GHz and 0.64-0.88x that of the fastest CPU decoder on each file
-  (`../../BENCHMARKS.md`). With the harness it needs 6,211 LUTs, 33 DSPs and 9 block-RAM tiles (the
+  clock count equals the cycle-exact simulation. That is 0.63-0.82x the time of libjpeg-turbo
+  -nosmooth on one laptop core at 3.9 GHz and 0.64-0.82x that of the fastest CPU decoder on each file
+  (CPU decoders re-measured on 2026-10-12; `../../BENCHMARKS.md`). With the harness it needs 6,211 LUTs, 33 DSPs and 9 block-RAM tiles (the
   decoder alone 5,827 LUTs, 6,831 flip-flops); 150 MHz is met with `VIVADO_EFFORT=high` (+0.013 ns).
   The 24 files ran on the build before two fixes found by Vivado's xsim (a missing reset of the IDCT
   pipeline's valid bits; a workaround for an xsim bug); the final bitstream was run on 3 of them
@@ -168,18 +179,33 @@ of `uart_bench_core.sv`, the lane number in byte 5) comes back as soon as it has
 - **Simulation** (3 lanes, Verilator): 24 results in three runs - distinct files in rounds, malformed
   and truncated files with one-byte packets, broadcast rounds - all equal to the decoder's own
   simulation and to libjpeg 9e.
+- **Harness change (2026-10-09), after the board run.** `uart_batch_core.sv` now finds the lowest lane
+  with a result first and then reads that lane's record once by index; before, it assigned the whole
+  256-bit record inside the loop over the lanes, and Vivado's synthesis of that core with 15 lanes
+  needed 5.4 GB on its own on the XC7A200T (more than 9 GB on a Kintex UltraScale+ KU5P). Now 2.9 GB
+  (3.5 GB on the KU5P), and 1,492 LUTs instead of 1,843 for the core, with the same registers; the
+  whole 15-lane build (11.2 GB synthesis peak before) was not re-run. The same 24-result simulation gives identical result records before
+  and after the change (all 18 decodable results equal to libjpeg 9e and to the decoder's own clock
+  counts, the 6 malformed files with their expected error bits). The bitstream of the board run above
+  was built from the previous version.
 - **On the board: 18/18 identical to libjpeg 9e, every clock count equal to the simulation.**
   adapter.jpg broadcast to all 15 lanes: 6,049,456 clocks in every lane; then three photos in lanes
   0-2 (IMG20260716020409.jpg 3,825,225, IMG20260716020422_420.jpg 3,304,743,
   IMG20260716020424_420.jpg 3,305,261 clocks).
 - **Throughput** (from the measured counts): 15 adapter.jpg in 40.33 ms, 372 photos/s or 4.83
-  Gpixel/s, 20.7x one laptop core at a steady 3.9 GHz (libjpeg-turbo -nosmooth, the fastest CPU
-  decoder on this photo, 55.5 ms) and about 10x the fastest desktop core (estimate: 2.04x the laptop
-  core, libjpeg-turbo tjbench on OpenBenchmarking). On the 24 photo files (each file's measured
-  count, spread over the 15 lanes) 408 photos/s, 5.5x the laptop's whole CPU measured on the same
-  files (74.5 photos/s on 4 cores / 8 threads at 2.35 GHz, its ~18 W limit; `../../bench/bench_multicore.py`).
+  Gpixel/s, 20.3x one laptop core at a steady 3.9 GHz (libjpeg-turbo -nosmooth, the fastest CPU
+  decoder on this photo, 54.6 ms on 2026-10-12) and about 10x a hypothetical core 2.04x the laptop's (the libjpeg-turbo tjbench ratio of a Core Ultra 9 285K to the i7-8550U on OpenBenchmarking, 359 vs 176 Mpixel/s; not measured on these files). On the 24 photo files (each file's
+  measured count, spread over the 15 lanes, longest first) 408 photos/s (371.5 in file order, 470.8
+  with ideal balance), 5.7x the laptop's whole CPU measured on the same
+  files (71.2 photos/s on 4 cores / 8 threads, the median of three runs on 2026-10-12, at about 2.3 GHz and
+  16-17 W; one run on 2026-10-05 gave 74.5, 5.5x; `../../bench/bench_multicore.py`).
   A real system has to feed every lane at full speed (here the 1 Mbaud UART cannot; the lanes'
-  clocks pause while they wait).
+  clocks pause while they wait: the adapter.jpg upload took 35.7 s, its decode 40.33 ms): 372
+  adapter-sized photos/s need about 1.3 GB/s of JPEG in and 14.5 GB/s of RGB out. The 15 lanes
+  decoded copies of one file sent once (broadcast), not 15 distinct files; these are compute rates.
+- **Sources of the results.** Single-lane runs: the 24 files with the RTL before `6846718` (the two
+  xsim fixes), the final bitstream (3 files) with `6846718`; the 15-lane batch with `d6448a2`, before
+  the UART-core change `6bf75dd`.
 
 ```sh
 # build (three processes; VIVADO_THREADS, VIVADO_EFFORT=high as for build.tcl)

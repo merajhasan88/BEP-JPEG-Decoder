@@ -1,4 +1,11 @@
 # file err-bits(hex, at least) pixels-allowed   (written by export_expectations.py)
+ac_symbol_0b 8 0
+ac_symbol_0f 8 0
+ac_symbol_10 8 0
+ac_symbol_20 8 0
+ac_symbol_e0 8 0
+bg_ycc_ids 1 0
+com_after_scan_no_eoi 1000 1
 dht_all_ones 8 0
 dht_dc_symbol12 8 0
 dht_id2 8 0
@@ -8,8 +15,25 @@ dqt_id4 4 0
 dqt_incomplete 4 0
 dqt_missing 4 0
 dqt_zero_q 4 0
+dri_len0 200 1
+dri_len1 200 1
+dri_len2 200 1
+dri_len3 200 1
+dri_len5 200 1
+dup_ci_sof_and_sos 800 0
+lse_colour_transform 1 0
 rst_out_of_order 100 1
 rst_without_dri 100 1
+seg_c0_len0 800 0
+seg_c0_len1 800 0
+seg_c0_len2 800 0
+seg_c4_len0 8 0
+seg_c4_len1 8 0
+seg_da_len0 40 0
+seg_da_len1 40 0
+seg_da_len2 40 0
+seg_db_len0 4 0
+seg_db_len1 4 0
 sof_dup_ci 40 0
 sof_height0_dnl 800 0
 sof_length 800 0

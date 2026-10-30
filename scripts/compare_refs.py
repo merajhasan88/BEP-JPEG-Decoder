@@ -8,6 +8,8 @@ For every JPEG given, the model is run in each output mode and compared with:
   rgb   (box + turbo colour)    vs  turbo `djpeg -dct int -nosmooth`
   rgb   (box + libjpeg9 colour) is the default profile, checked against djpeg 9e elsewhere (tb/golden).
 The fancy upsampler is also cross-checked against a literal transcription of turbo's C loops.
+An RGB-coded image (libjpeg 9e's colour-space rule) is compared in RGB only: the decoder, and so the model,
+gives no YCbCr or grey output of it.
 usage: compare_refs.py file.jpg [...]      exit status 0 = everything identical"""
 import sys, os, re, subprocess, io
 import numpy as np
@@ -53,8 +55,12 @@ for path in sys.argv[1:]:
         print("%-34s skipped (SOF%s, not a baseline file: the decoder rejects it)" % (os.path.basename(path), sof_type(data))); continue
     try:
         m_rgb = rgb3(model(data, upsample='fancy', cc='turbo', out='rgb'))
-        m_ycc = model(data, upsample='fancy', cc='turbo', out='ycbcr')
-        m_y   = model(data, upsample='fancy', cc='turbo', out='y')
+        try:
+            m_ycc = model(data, upsample='fancy', cc='turbo', out='ycbcr')
+            m_y   = model(data, upsample='fancy', cc='turbo', out='y')
+            rgb_coded = False
+        except ValueError:                        # an RGB-coded image: RGB output only
+            m_ycc = m_y = None; rgb_coded = True
         m_box = rgb3(model(data, upsample='box', cc='turbo', out='rgb'))
     except AssertionError as e:
         print("%-34s MODEL CROSSCHECK FAILED: %s" % (os.path.basename(path), e)); bad += 1; continue
@@ -63,14 +69,17 @@ for path in sys.argv[1:]:
     r.append(cmp(m_rgb, np.asarray(Image.open(path).convert('RGB'))))
     r.append(cmp(m_rgb, cv2.imread(path, cv2.IMREAD_COLOR)[:, :, ::-1]))
     r.append(cmp(m_rgb, rgb3(djpeg(path))))
-    if is_gray:
-        r.append("n/a (grey)")
+    if rgb_coded:
+        r += ["n/a (RGB-coded)"] * 3
     else:
-        iy = Image.open(path); iy.draft('YCbCr', None); r.append(cmp(m_ycc, np.asarray(iy)) if iy.mode == 'YCbCr' else "draft failed")
-    il = Image.open(path); il.draft('L', None); r.append(cmp(m_y, np.asarray(il)))
-    r.append(cmp(m_y, djpeg(path, "-grayscale")))
+        if is_gray:
+            r.append("n/a (grey)")
+        else:
+            iy = Image.open(path); iy.draft('YCbCr', None); r.append(cmp(m_ycc, np.asarray(iy)) if iy.mode == 'YCbCr' else "draft failed")
+        il = Image.open(path); il.draft('L', None); r.append(cmp(m_y, np.asarray(il)))
+        r.append(cmp(m_y, djpeg(path, "-grayscale")))
     r.append(cmp(m_box, rgb3(djpeg(path, "-nosmooth"))))
-    bad += sum(1 for x in r if x not in ("ok", "n/a (grey)"))
+    bad += sum(1 for x in r if not (x == "ok" or x.startswith("n/a")))
     print("%-34s " % os.path.basename(path) + " ".join("%-18s" % x for x in r))
 print("ALL IDENTICAL" if bad == 0 else "%d MISMATCHES" % bad)
 sys.exit(1 if bad else 0)

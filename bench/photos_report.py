@@ -34,8 +34,8 @@ def main():
                        ("4:2:0 re-encodes of the same photos (core_jpeg supports only 4:4:4 / 4:2:0)", lambda n: n.endswith("_420"))):
         names = [n for n in res if sel(n)]
         print(f"#### {title}\n")
-        wcol = f" **BEBCL-JPEG `FAST=2`** Artix-7 {mhz['3']:.0f} MHz |" if wide else ""
-        print("| photo | " + " | ".join(c for _, c in CPU) + f" |{wcol} BEBCL-JPEG `FAST=1` Artix-7 150 MHz | BEBCL-JPEG `FAST=1` EP2C5 95 MHz | aq_djpeg Artix-7 150 MHz | core_jpeg Artix-7 92.3 MHz |")
+        wcol = f" **BEP-JPEG `FAST=2`** Artix-7 {mhz['3']:.0f} MHz |" if wide else ""
+        print("| photo | " + " | ".join(c for _, c in CPU) + f" |{wcol} BEP-JPEG `FAST=1` Artix-7 150 MHz | BEP-JPEG `FAST=1` EP2C5 95 MHz | aq_djpeg Artix-7 150 MHz | core_jpeg Artix-7 92.3 MHz |")
         print("|---|" + "---:|" * (len(CPU) + 4 + wide))
         best_ratio = []; turbo_ratio = []; cpp_turbo = []; cpp_ours = []; w_turbo = []; w_best = []; w_cpp = []
         for n in names:
@@ -61,14 +61,14 @@ def main():
                 best_ratio.append(ms0 / best); turbo_ratio.append(ms0 / at_ref(r["libjpeg-turbo (nosmooth)"]))
                 t = r["libjpeg-turbo (nosmooth)"]; px = int(board[f"0/{f}"]["pixels"])
                 cpp_turbo.append(t["ms"] * 1e-3 * t["ghz"] * 1e9 / px); cpp_ours.append(int(board[f"0/{f}"]["clocks"]) / px)
-        print(f"\nBEBCL-JPEG (`FAST=1`) on the Artix-7 takes {min(turbo_ratio):.2f}-{max(turbo_ratio):.2f}x the time of "
+        print(f"\nBEP-JPEG (`FAST=1`) on the Artix-7 takes {min(turbo_ratio):.2f}-{max(turbo_ratio):.2f}x the time of "
               f"libjpeg-turbo -nosmooth at {REF_GHZ} GHz per photo ({min(best_ratio):.2f}-{max(best_ratio):.2f}x that of the "
               f"fastest CPU decoder on each photo); per clock it does "
               f"{min(a / b for a, b in zip(cpp_turbo, cpp_ours)):.1f}-{max(a / b for a, b in zip(cpp_turbo, cpp_ours)):.1f}x "
               f"more work ({min(cpp_ours):.2f}-{max(cpp_ours):.2f} clocks/pixel against libjpeg-turbo's "
               f"{min(cpp_turbo):.1f}-{max(cpp_turbo):.1f} CPU clocks/pixel).\n")
         if w_turbo:
-            print(f"BEBCL-JPEG `FAST=2` (the wide core) on the Artix-7 at {mhz['3']:.0f} MHz takes {min(w_turbo):.2f}-{max(w_turbo):.2f}x "
+            print(f"BEP-JPEG `FAST=2` (the wide core) on the Artix-7 at {mhz['3']:.0f} MHz takes {min(w_turbo):.2f}-{max(w_turbo):.2f}x "
                   f"the time of libjpeg-turbo -nosmooth at {REF_GHZ} GHz ({1/max(w_turbo):.2f}-{1/min(w_turbo):.2f}x faster) and "
                   f"{min(w_best):.2f}-{max(w_best):.2f}x that of the fastest CPU decoder on each photo; "
                   f"{min(w_cpp):.3f}-{max(w_cpp):.3f} clocks/pixel.\n")

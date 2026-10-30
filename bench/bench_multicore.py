@@ -6,7 +6,9 @@ at the same time for a fixed time (whole passes only). Reported per run: photos/
 sum of the workers' rates), each worker's average clock (perf stat: cycles / task time), the package
 energy (RAPL) per photo when readable, and the rate rescaled to a steady 3.9 GHz (the CPU's best case,
 as in the single-core comparisons). The FPGA batch is compared on the same photo set.
-  [BENCH_POWER_PROFILE=performance] bench_multicore.py out.json [--seconds 60] [--runs 1:0,4:0-3,8:0-7] [files]
+  [BENCH_POWER_PROFILE=performance] bench_multicore.py out.json [--seconds 60] [--runs 1:0,4:0-3,8:0-7] [--repeat 3] [files]
+--repeat: each run that many times (15 s cool-down before each), for the spread; "summary" gives the
+lowest, median and highest photos/s per run. "meta": versions, power settings and input hashes.
 --runs: workers:cpu-list per run (on this i7-8550U, CPUs 0-3 are the four cores, 4-7 their second
 hyper-threads). With BENCH_POWER_PROFILE the script sets that power profile for the runs and restores
 the previous one at the end (powerprofilesctl)."""
@@ -70,7 +72,7 @@ def main():
         if name in args:
             i = args.index(name); v = args[i + 1]; del args[i:i + 2]; return v
         return default
-    secs = float(opt("--seconds", "60")); runs = opt("--runs", "1:0,4:0-3,8:0-7")
+    secs = float(opt("--seconds", "60")); runs = opt("--runs", "1:0,4:0-3,8:0-7"); repeat = int(opt("--repeat", "1"))
     out_json = args[0]; files = args[1:]
     if not files:
         import perf_model
@@ -85,18 +87,31 @@ def main():
     try:
         if want: profile(want)
         result["power_profile"] = profile()
+        sys.path.insert(0, HERE); import tools
+        result["meta"] = tools.meta([(os.path.basename(f), f) for f in files], runs, result["power_profile"],
+                                    method=f"N workers (bench_throughput.c, libjpeg-turbo -nosmooth), each pinned to one logical "
+                                           f"CPU, decode the photo set round-robin for {secs:g} s (whole passes); each run "
+                                           f"{repeat} time(s) after a 15 s cool-down; clocks by perf stat per worker")
         with tempfile.TemporaryDirectory() as tmp:
-            for k, spec in enumerate(runs.split(",")):
+            k = 0
+            for spec in runs.split(","):
                 n, cl = spec.split(":")
-                if k: time.sleep(15)                                  # a short cool-down between runs
-                r = one_run(exe, files, int(n), cpus(cl), secs, tmp)
-                result["runs"].append(r)
+                for rep in range(repeat):
+                    if k: time.sleep(15)                              # a short cool-down between runs
+                    k += 1
+                    r = one_run(exe, files, int(n), cpus(cl), secs, tmp)
+                    r["spec"] = spec; r["repeat"] = rep
+                    result["runs"].append(r)
                 print(f"{r['workers']} workers on CPUs {cl}: {r['photos_per_s']:.1f} photos/s, {r['mpix_per_s']:.0f} Mpixel/s, "
                       f"mean clock {r['mean_ghz']:.2f} GHz ({r['photos_per_s_at_3p9ghz']:.1f} photos/s at a steady 3.9 GHz)"
                       + (f", {r['package_watts']:.1f} W, {r['package_joules_per_photo']:.2f} J/photo" if "package_watts" in r else ""), flush=True)
     finally:
         if want and before: profile(before)
         result["power_profile_after"] = profile()
+        summ = {}
+        for r in result["runs"]: summ.setdefault(r["spec"], []).append(r["photos_per_s"])
+        result["summary"] = {s: dict(runs=len(v), photos_per_s_min=min(v), photos_per_s_median=sorted(v)[len(v) // 2],
+                                     photos_per_s_max=max(v)) for s, v in summ.items()}
         json.dump(result, open(out_json, "w"), indent=1)
 
 

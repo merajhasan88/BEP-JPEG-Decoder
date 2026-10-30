@@ -158,18 +158,21 @@ module uart_batch_core #(
   always_ff @(posedge clk) begin : p_tx
     integer i;
     logic   found;
+    logic [LW-1:0] sel;
     if (rst) begin sent_r <= '0; tsend <= 1'b0; ti <= '0; tbusy <= 1'b0; uart_tx <= 1'b1; end
     else begin
       sent_r <= sent_r & ~restart_v;
       if (!tsend) begin
-        found = 1'b0;
+        // the lowest lane with a result, then its record read once by index: assigning the whole
+        // record inside the loop made Vivado's synthesis of 15 lanes need more than 9 GB
+        found = 1'b0; sel = '0;
         for (i = 0; i < N; i = i + 1)
-          if (!found && ready[i]) begin
-            found = 1'b1;
-            sent_r[i] <= 1'b1; tsend <= 1'b1; ti <= '0;
-            res <= {8'h52, 8'h45, 8'h53, DUT_ID, {5'd0, 1'b1, l_wdog[i], l_ovf[i]}, i[7:0], 16'd0,
-                    l_cyc[i], l_chk[i], {3'd0, l_err[i]}, l_w[i], l_h[i], l_npx[i], nrx[i], 16'd0};
-          end
+          if (!found && ready[i]) begin found = 1'b1; sel = i[LW-1:0]; end
+        if (found) begin
+          sent_r[sel] <= 1'b1; tsend <= 1'b1; ti <= '0;
+          res <= {8'h52, 8'h45, 8'h53, DUT_ID, {5'd0, 1'b1, l_wdog[sel], l_ovf[sel]}, {{(8-LW){1'b0}}, sel}, 16'd0,
+                  l_cyc[sel], l_chk[sel], {3'd0, l_err[sel]}, l_w[sel], l_h[sel], l_npx[sel], nrx[sel], 16'd0};
+        end
       end
       if (tsend && !tbusy) begin
         if (ti == 6'd32) tsend <= 1'b0;

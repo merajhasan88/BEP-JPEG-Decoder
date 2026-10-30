@@ -1,0 +1,1041 @@
+{
+ "date": "2026-10-10",
+ "what": "clocks of FAST=1 (tb/obj_fmcu) and FAST=2 (tb/obj_wmcu), Verilator, RGB, MCU order; corpus measured by perf_by_image.py at the commit in bench/manifest_2026-10-10.json (RTL unchanged since); photos from model/perf/wide_photos_sim_2026-10-04.json (wide clocks reproduced 2026-10-10)",
+ "rows": [
+  {
+   "dri": 0,
+   "h": 11,
+   "w": 13,
+   "sub": "grey",
+   "scan_bytes": 44,
+   "bytes": 374,
+   "file": "adp_13x11_q40_gray",
+   "kind": "corpus",
+   "q": 40,
+   "fast": {
+    "setup": 835,
+    "total": 1192
+   },
+   "wide": {
+    "setup": 835,
+    "total": 964
+   }
+  },
+  {
+   "dri": 0,
+   "h": 120,
+   "w": 160,
+   "sub": "4:4:4",
+   "scan_bytes": 11726,
+   "bytes": 12351,
+   "file": "adp_160x120_q95_444",
+   "kind": "corpus",
+   "q": 95,
+   "fast": {
+    "setup": 1632,
+    "total": 58497
+   },
+   "wide": {
+    "setup": 1632,
+    "total": 19559
+   }
+  },
+  {
+   "dri": 0,
+   "h": 16,
+   "w": 16,
+   "sub": "4:2:0",
+   "scan_bytes": 37,
+   "bytes": 335,
+   "file": "adp_16x16_q25_420",
+   "kind": "corpus",
+   "q": 25,
+   "fast": {
+    "setup": 1321,
+    "total": 1941
+   },
+   "wide": {
+    "setup": 1321,
+    "total": 1509
+   }
+  },
+  {
+   "dri": 0,
+   "h": 16,
+   "w": 16,
+   "sub": "grey",
+   "scan_bytes": 35,
+   "bytes": 208,
+   "file": "adp_16x16_q25_gray",
+   "kind": "corpus",
+   "q": 25,
+   "fast": {
+    "setup": 682,
+    "total": 1080
+   },
+   "wide": {
+    "setup": 682,
+    "total": 810
+   }
+  },
+  {
+   "dri": 0,
+   "h": 33,
+   "w": 17,
+   "sub": "4:2:0",
+   "scan_bytes": 159,
+   "bytes": 784,
+   "file": "adp_17x33_q40_420",
+   "kind": "corpus",
+   "q": 40,
+   "fast": {
+    "setup": 1632,
+    "total": 3206
+   },
+   "wide": {
+    "setup": 1632,
+    "total": 2076
+   }
+  },
+  {
+   "dri": 0,
+   "h": 1,
+   "w": 1,
+   "sub": "4:2:0",
+   "scan_bytes": 6,
+   "bytes": 631,
+   "file": "adp_1x1_q50_420",
+   "kind": "corpus",
+   "q": 50,
+   "fast": {
+    "setup": 1632,
+    "total": 1894
+   },
+   "wide": {
+    "setup": 1632,
+    "total": 1721
+   }
+  },
+  {
+   "dri": 4,
+   "h": 320,
+   "w": 240,
+   "sub": "4:2:2",
+   "scan_bytes": 36135,
+   "bytes": 36766,
+   "file": "adp_240x320_q95_422_rst4",
+   "kind": "corpus",
+   "q": 95,
+   "fast": {
+    "setup": 1639,
+    "total": 169093
+   },
+   "wide": {
+    "setup": 1639,
+    "total": 58235
+   }
+  },
+  {
+   "dri": 0,
+   "h": 64,
+   "w": 256,
+   "sub": "grey",
+   "scan_bytes": 9195,
+   "bytes": 9525,
+   "file": "adp_256x64_q98_gray",
+   "kind": "corpus",
+   "q": 98,
+   "fast": {
+    "setup": 835,
+    "total": 38973
+   },
+   "wide": {
+    "setup": 835,
+    "total": 13840
+   }
+  },
+  {
+   "dri": 0,
+   "h": 240,
+   "w": 320,
+   "sub": "4:2:0",
+   "scan_bytes": 21922,
+   "bytes": 22547,
+   "file": "adp_320x240_q90_420",
+   "kind": "corpus",
+   "q": 90,
+   "fast": {
+    "setup": 1632,
+    "total": 113989
+   },
+   "wide": {
+    "setup": 1632,
+    "total": 36536
+   }
+  },
+  {
+   "dri": 0,
+   "h": 32,
+   "w": 32,
+   "sub": "4:2:0",
+   "scan_bytes": 140,
+   "bytes": 448,
+   "file": "adp_32x32_q25_420",
+   "kind": "corpus",
+   "q": 25,
+   "fast": {
+    "setup": 1325,
+    "total": 2692
+   },
+   "wide": {
+    "setup": 1325,
+    "total": 1700
+   }
+  },
+  {
+   "dri": 0,
+   "h": 32,
+   "w": 32,
+   "sub": "4:4:4",
+   "scan_bytes": 163,
+   "bytes": 478,
+   "file": "adp_32x32_q25_444",
+   "kind": "corpus",
+   "q": 25,
+   "fast": {
+    "setup": 1328,
+    "total": 3253
+   },
+   "wide": {
+    "setup": 1328,
+    "total": 1785
+   }
+  },
+  {
+   "dri": 0,
+   "h": 18,
+   "w": 33,
+   "sub": "4:4:0",
+   "scan_bytes": 178,
+   "bytes": 803,
+   "file": "adp_33x18_q40_440",
+   "kind": "corpus",
+   "q": 40,
+   "fast": {
+    "setup": 1632,
+    "total": 3263
+   },
+   "wide": {
+    "setup": 1632,
+    "total": 2074
+   }
+  },
+  {
+   "dri": 0,
+   "h": 5,
+   "w": 3,
+   "sub": "4:2:0",
+   "scan_bytes": 19,
+   "bytes": 644,
+   "file": "adp_3x5_q50_420",
+   "kind": "corpus",
+   "q": 50,
+   "fast": {
+    "setup": 1632,
+    "total": 1968
+   },
+   "wide": {
+    "setup": 1632,
+    "total": 1750
+   }
+  },
+  {
+   "dri": 0,
+   "h": 40,
+   "w": 40,
+   "sub": "mixed",
+   "scan_bytes": 196,
+   "bytes": 821,
+   "file": "adp_40x40_q40_lumasub",
+   "kind": "corpus",
+   "q": 40,
+   "fast": {
+    "setup": 1632,
+    "total": 4653
+   },
+   "wide": {
+    "setup": 1632,
+    "total": 2390
+   }
+  },
+  {
+   "dri": 3,
+   "h": 50,
+   "w": 40,
+   "sub": "4:2:0",
+   "scan_bytes": 331,
+   "bytes": 962,
+   "file": "adp_40x50_q30_420_rst3",
+   "kind": "corpus",
+   "q": 30,
+   "fast": {
+    "setup": 1639,
+    "total": 4593
+   },
+   "wide": {
+    "setup": 1639,
+    "total": 2464
+   }
+  },
+  {
+   "dri": 2,
+   "h": 37,
+   "w": 45,
+   "sub": "4:2:0",
+   "scan_bytes": 281,
+   "bytes": 912,
+   "file": "adp_45x37_q30_420_rst2",
+   "kind": "corpus",
+   "q": 30,
+   "fast": {
+    "setup": 1639,
+    "total": 3902
+   },
+   "wide": {
+    "setup": 1639,
+    "total": 2313
+   }
+  },
+  {
+   "dri": 0,
+   "h": 37,
+   "w": 45,
+   "sub": "4:2:2",
+   "scan_bytes": 280,
+   "bytes": 905,
+   "file": "adp_45x37_q30_422",
+   "kind": "corpus",
+   "q": 30,
+   "fast": {
+    "setup": 1632,
+    "total": 4086
+   },
+   "wide": {
+    "setup": 1632,
+    "total": 2263
+   }
+  },
+  {
+   "dri": 0,
+   "h": 37,
+   "w": 45,
+   "sub": "4:2:2",
+   "scan_bytes": 280,
+   "bytes": 1296,
+   "file": "adp_45x37_q30_422_exifthumb",
+   "kind": "corpus",
+   "q": 30,
+   "fast": {
+    "setup": 2025,
+    "total": 4478
+   },
+   "wide": {
+    "setup": 2025,
+    "total": 2656
+   }
+  },
+  {
+   "dri": 6,
+   "h": 37,
+   "w": 45,
+   "sub": "4:4:0",
+   "scan_bytes": 293,
+   "bytes": 924,
+   "file": "adp_45x37_q30_440_rst1row",
+   "kind": "corpus",
+   "q": 30,
+   "fast": {
+    "setup": 1639,
+    "total": 4458
+   },
+   "wide": {
+    "setup": 1639,
+    "total": 2374
+   }
+  },
+  {
+   "dri": 3,
+   "h": 37,
+   "w": 45,
+   "sub": "grey",
+   "scan_bytes": 259,
+   "bytes": 595,
+   "file": "adp_45x37_q30_gray_rst3",
+   "kind": "corpus",
+   "q": 30,
+   "fast": {
+    "setup": 842,
+    "total": 2663
+   },
+   "wide": {
+    "setup": 842,
+    "total": 1441
+   }
+  },
+  {
+   "dri": 0,
+   "h": 40,
+   "w": 48,
+   "sub": "mixed",
+   "scan_bytes": 365,
+   "bytes": 990,
+   "file": "adp_48x40_q40_mixed",
+   "kind": "corpus",
+   "q": 40,
+   "fast": {
+    "setup": 1632,
+    "total": 4741
+   },
+   "wide": {
+    "setup": 1632,
+    "total": 2519
+   }
+  },
+  {
+   "dri": 0,
+   "h": 6,
+   "w": 4,
+   "sub": "4:2:2",
+   "scan_bytes": 22,
+   "bytes": 647,
+   "file": "adp_4x6_q50_422",
+   "kind": "corpus",
+   "q": 50,
+   "fast": {
+    "setup": 1632,
+    "total": 1909
+   },
+   "wide": {
+    "setup": 1632,
+    "total": 1729
+   }
+  },
+  {
+   "dri": 0,
+   "h": 3,
+   "w": 5,
+   "sub": "4:2:0",
+   "scan_bytes": 19,
+   "bytes": 644,
+   "file": "adp_5x3_q50_420",
+   "kind": "corpus",
+   "q": 50,
+   "fast": {
+    "setup": 1632,
+    "total": 1972
+   },
+   "wide": {
+    "setup": 1632,
+    "total": 1750
+   }
+  },
+  {
+   "dri": 0,
+   "h": 64,
+   "w": 64,
+   "sub": "4:2:0",
+   "scan_bytes": 441,
+   "bytes": 761,
+   "file": "adp_64x64_q25_420",
+   "kind": "corpus",
+   "q": 25,
+   "fast": {
+    "setup": 1334,
+    "total": 5780
+   },
+   "wide": {
+    "setup": 1334,
+    "total": 2491
+   }
+  },
+  {
+   "dri": 0,
+   "h": 8,
+   "w": 8,
+   "sub": "grey",
+   "scan_bytes": 7,
+   "bytes": 337,
+   "file": "adp_8x8_q10_gray",
+   "kind": "corpus",
+   "q": 10,
+   "fast": {
+    "setup": 835,
+    "total": 1025
+   },
+   "wide": {
+    "setup": 835,
+    "total": 908
+   }
+  },
+  {
+   "dri": 0,
+   "h": 32,
+   "w": 352,
+   "sub": "4:2:0",
+   "scan_bytes": 391,
+   "bytes": 1016,
+   "file": "board_352x32_q6_420",
+   "kind": "corpus",
+   "q": 6,
+   "fast": {
+    "setup": 1632,
+    "total": 13200
+   },
+   "wide": {
+    "setup": 1632,
+    "total": 4579
+   }
+  },
+  {
+   "dri": 0,
+   "h": 6,
+   "w": 1152,
+   "sub": "grey",
+   "scan_bytes": 393,
+   "bytes": 723,
+   "file": "wide_1152x6_q20_gray",
+   "kind": "corpus",
+   "q": 20,
+   "fast": {
+    "setup": 835,
+    "total": 7992
+   },
+   "wide": {
+    "setup": 835,
+    "total": 2754
+   }
+  },
+  {
+   "dri": 0,
+   "h": 6,
+   "w": 1160,
+   "sub": "grey",
+   "scan_bytes": 397,
+   "bytes": 727,
+   "file": "wide_1160x6_q20_gray",
+   "kind": "corpus",
+   "q": 20,
+   "fast": {
+    "setup": 835,
+    "total": 8041
+   },
+   "wide": {
+    "setup": 835,
+    "total": 2767
+   }
+  },
+  {
+   "dri": 0,
+   "h": 20,
+   "w": 352,
+   "sub": "4:2:0",
+   "scan_bytes": 629,
+   "bytes": 1254,
+   "file": "wide_352x20_q20_420",
+   "kind": "corpus",
+   "q": 20,
+   "fast": {
+    "setup": 1632,
+    "total": 11909
+   },
+   "wide": {
+    "setup": 1632,
+    "total": 4152
+   }
+  },
+  {
+   "dri": 0,
+   "h": 20,
+   "w": 368,
+   "sub": "4:2:0",
+   "scan_bytes": 649,
+   "bytes": 1274,
+   "file": "wide_368x20_q20_420",
+   "kind": "corpus",
+   "q": 20,
+   "fast": {
+    "setup": 1632,
+    "total": 12381
+   },
+   "wide": {
+    "setup": 1632,
+    "total": 4273
+   }
+  },
+  {
+   "dri": 0,
+   "h": 12,
+   "w": 384,
+   "sub": "4:4:4",
+   "scan_bytes": 521,
+   "bytes": 1146,
+   "file": "wide_384x12_q20_444",
+   "kind": "corpus",
+   "q": 20,
+   "fast": {
+    "setup": 1632,
+    "total": 11725
+   },
+   "wide": {
+    "setup": 1632,
+    "total": 4033
+   }
+  },
+  {
+   "dri": 0,
+   "h": 10,
+   "w": 576,
+   "sub": "4:2:2",
+   "scan_bytes": 577,
+   "bytes": 1202,
+   "file": "wide_576x10_q20_422",
+   "kind": "corpus",
+   "q": 20,
+   "fast": {
+    "setup": 1632,
+    "total": 11729
+   },
+   "wide": {
+    "setup": 1632,
+    "total": 4059
+   }
+  },
+  {
+   "dri": 0,
+   "h": 10,
+   "w": 592,
+   "sub": "4:2:2",
+   "scan_bytes": 577,
+   "bytes": 1202,
+   "file": "wide_592x10_q20_422",
+   "kind": "corpus",
+   "q": 20,
+   "fast": {
+    "setup": 1632,
+    "total": 11949
+   },
+   "wide": {
+    "setup": 1632,
+    "total": 4110
+   }
+  },
+  {
+   "dri": 0,
+   "h": 4160,
+   "w": 3120,
+   "sub": "4:2:2",
+   "scan_bytes": 3429683,
+   "bytes": 3733794,
+   "file": "IMG20260405182829.jpg",
+   "kind": "photo",
+   "q": 95,
+   "fast": {
+    "total": 20908689
+   },
+   "wide": {
+    "total": 6834885
+   }
+  },
+  {
+   "dri": 0,
+   "h": 4160,
+   "w": 3120,
+   "sub": "4:2:2",
+   "scan_bytes": 3572680,
+   "bytes": 3876791,
+   "file": "IMG20260405182833.jpg",
+   "kind": "photo",
+   "q": 95,
+   "fast": {
+    "total": 21531453
+   },
+   "wide": {
+    "total": 7088167
+   }
+  },
+  {
+   "dri": 0,
+   "h": 4160,
+   "w": 3120,
+   "sub": "4:2:2",
+   "scan_bytes": 3003198,
+   "bytes": 3307309,
+   "file": "IMG20260425135544.jpg",
+   "kind": "photo",
+   "q": 95,
+   "fast": {
+    "total": 19143517
+   },
+   "wide": {
+    "total": 5527453
+   }
+  },
+  {
+   "dri": 0,
+   "h": 3120,
+   "w": 4160,
+   "sub": "4:2:2",
+   "scan_bytes": 4429775,
+   "bytes": 4733886,
+   "file": "IMG20260425135628.jpg",
+   "kind": "photo",
+   "q": 95,
+   "fast": {
+    "total": 23107669
+   },
+   "wide": {
+    "total": 7282828
+   }
+  },
+  {
+   "dri": 0,
+   "h": 3120,
+   "w": 4160,
+   "sub": "4:2:2",
+   "scan_bytes": 3159056,
+   "bytes": 3463167,
+   "file": "IMG20260425141210.jpg",
+   "kind": "photo",
+   "q": 95,
+   "fast": {
+    "total": 19061153
+   },
+   "wide": {
+    "total": 5735471
+   }
+  },
+  {
+   "dri": 0,
+   "h": 4160,
+   "w": 3120,
+   "sub": "4:2:2",
+   "scan_bytes": 3413318,
+   "bytes": 3717923,
+   "file": "IMG20260523191343.jpg",
+   "kind": "photo",
+   "q": 95,
+   "fast": {
+    "total": 20037777
+   },
+   "wide": {
+    "total": 6121368
+   }
+  },
+  {
+   "dri": 0,
+   "h": 3120,
+   "w": 4160,
+   "sub": "4:2:2",
+   "scan_bytes": 2385385,
+   "bytes": 2689496,
+   "file": "IMG20260612210949.jpg",
+   "kind": "photo",
+   "q": 95,
+   "fast": {
+    "total": 17004745
+   },
+   "wide": {
+    "total": 4511424
+   }
+  },
+  {
+   "dri": 0,
+   "h": 3120,
+   "w": 4160,
+   "sub": "4:2:2",
+   "scan_bytes": 1359316,
+   "bytes": 1663427,
+   "file": "IMG20260716020409.jpg",
+   "kind": "photo",
+   "q": 95,
+   "fast": {
+    "total": 15364517
+   },
+   "wide": {
+    "total": 3825225
+   }
+  },
+  {
+   "dri": 0,
+   "h": 3120,
+   "w": 4160,
+   "sub": "4:2:2",
+   "scan_bytes": 1406551,
+   "bytes": 1710756,
+   "file": "IMG20260716020422.jpg",
+   "kind": "photo",
+   "q": 95,
+   "fast": {
+    "total": 15411569
+   },
+   "wide": {
+    "total": 3872129
+   }
+  },
+  {
+   "dri": 0,
+   "h": 3120,
+   "w": 4160,
+   "sub": "4:2:2",
+   "scan_bytes": 1370768,
+   "bytes": 1674973,
+   "file": "IMG20260716020424.jpg",
+   "kind": "photo",
+   "q": 95,
+   "fast": {
+    "total": 15364489
+   },
+   "wide": {
+    "total": 3845880
+   }
+  },
+  {
+   "dri": 0,
+   "h": 3120,
+   "w": 4160,
+   "sub": "4:2:2",
+   "scan_bytes": 2313656,
+   "bytes": 2617767,
+   "file": "IMG20260723160735.jpg",
+   "kind": "photo",
+   "q": 95,
+   "fast": {
+    "total": 17368025
+   },
+   "wide": {
+    "total": 4696006
+   }
+  },
+  {
+   "dri": 0,
+   "h": 4160,
+   "w": 3120,
+   "sub": "4:2:2",
+   "scan_bytes": 3229139,
+   "bytes": 3533250,
+   "file": "adapter.jpg",
+   "kind": "photo",
+   "q": 95,
+   "fast": {
+    "total": 19234181
+   },
+   "wide": {
+    "total": 6049456
+   }
+  },
+  {
+   "dri": 0,
+   "h": 4160,
+   "w": 3120,
+   "sub": "4:2:0",
+   "scan_bytes": 2409020,
+   "bytes": 2409645,
+   "file": "IMG20260405182829_420.jpg",
+   "kind": "photo",
+   "q": 90,
+   "fast": {
+    "total": 15231961
+   },
+   "wide": {
+    "total": 4934321
+   }
+  },
+  {
+   "dri": 0,
+   "h": 4160,
+   "w": 3120,
+   "sub": "4:2:0",
+   "scan_bytes": 2521505,
+   "bytes": 2522130,
+   "file": "IMG20260405182833_420.jpg",
+   "kind": "photo",
+   "q": 90,
+   "fast": {
+    "total": 15664865
+   },
+   "wide": {
+    "total": 5136822
+   }
+  },
+  {
+   "dri": 0,
+   "h": 4160,
+   "w": 3120,
+   "sub": "4:2:0",
+   "scan_bytes": 2139491,
+   "bytes": 2140116,
+   "file": "IMG20260425135544_420.jpg",
+   "kind": "photo",
+   "q": 90,
+   "fast": {
+    "total": 14954646
+   },
+   "wide": {
+    "total": 4262388
+   }
+  },
+  {
+   "dri": 0,
+   "h": 3120,
+   "w": 4160,
+   "sub": "4:2:0",
+   "scan_bytes": 3222227,
+   "bytes": 3222852,
+   "file": "IMG20260425135628_420.jpg",
+   "kind": "photo",
+   "q": 90,
+   "fast": {
+    "total": 17724709
+   },
+   "wide": {
+    "total": 5411864
+   }
+  },
+  {
+   "dri": 0,
+   "h": 3120,
+   "w": 4160,
+   "sub": "4:2:0",
+   "scan_bytes": 2230841,
+   "bytes": 2231466,
+   "file": "IMG20260425141210_420.jpg",
+   "kind": "photo",
+   "q": 90,
+   "fast": {
+    "total": 14349817
+   },
+   "wide": {
+    "total": 4095509
+   }
+  },
+  {
+   "dri": 0,
+   "h": 4160,
+   "w": 3120,
+   "sub": "4:2:0",
+   "scan_bytes": 2405970,
+   "bytes": 2406595,
+   "file": "IMG20260523191343_420.jpg",
+   "kind": "photo",
+   "q": 90,
+   "fast": {
+    "total": 15008091
+   },
+   "wide": {
+    "total": 4284834
+   }
+  },
+  {
+   "dri": 0,
+   "h": 3120,
+   "w": 4160,
+   "sub": "4:2:0",
+   "scan_bytes": 1600023,
+   "bytes": 1600648,
+   "file": "IMG20260612210949_420.jpg",
+   "kind": "photo",
+   "q": 90,
+   "fast": {
+    "total": 13210175
+   },
+   "wide": {
+    "total": 3403678
+   }
+  },
+  {
+   "dri": 0,
+   "h": 3120,
+   "w": 4160,
+   "sub": "4:2:0",
+   "scan_bytes": 793846,
+   "bytes": 794471,
+   "file": "IMG20260716020409_420.jpg",
+   "kind": "photo",
+   "q": 90,
+   "fast": {
+    "total": 13057711
+   },
+   "wide": {
+    "total": 3314346
+   }
+  },
+  {
+   "dri": 0,
+   "h": 3120,
+   "w": 4160,
+   "sub": "4:2:0",
+   "scan_bytes": 958774,
+   "bytes": 959399,
+   "file": "IMG20260716020422_420.jpg",
+   "kind": "photo",
+   "q": 90,
+   "fast": {
+    "total": 13039929
+   },
+   "wide": {
+    "total": 3304743
+   }
+  },
+  {
+   "dri": 0,
+   "h": 3120,
+   "w": 4160,
+   "sub": "4:2:0",
+   "scan_bytes": 925798,
+   "bytes": 926423,
+   "file": "IMG20260716020424_420.jpg",
+   "kind": "photo",
+   "q": 90,
+   "fast": {
+    "total": 13041569
+   },
+   "wide": {
+    "total": 3305261
+   }
+  },
+  {
+   "dri": 0,
+   "h": 3120,
+   "w": 4160,
+   "sub": "4:2:0",
+   "scan_bytes": 1638255,
+   "bytes": 1638880,
+   "file": "IMG20260723160735_420.jpg",
+   "kind": "photo",
+   "q": 90,
+   "fast": {
+    "total": 13763058
+   },
+   "wide": {
+    "total": 3702006
+   }
+  },
+  {
+   "dri": 0,
+   "h": 4160,
+   "w": 3120,
+   "sub": "4:2:0",
+   "scan_bytes": 2244146,
+   "bytes": 2244771,
+   "file": "adapter_420.jpg",
+   "kind": "photo",
+   "q": 90,
+   "fast": {
+    "total": 13940234
+   },
+   "wide": {
+    "total": 4163793
+   }
+  }
+ ]
+}

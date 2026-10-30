@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 """Decode-speed benchmark: CPU decoders on this machine vs the RTL decoder's cycle counts.
 
-CPU side (single thread, pinned to one core, JPEG already in memory, median of ~0.1 s batches):
-  libjpeg-turbo 2.1.2 (C API)   default = ISLOW + fancy upsampling (what Pillow/OpenCV use); also -nosmooth
+CPU side (single thread, pinned to one core, JPEG already in memory, median of ~0.1 s batches; every
+batch's time, the versions of everything below, the core, power settings and input hashes are stored in
+the results' "meta" and per-decoder "batches_ms"):
+  libjpeg-turbo (C API)         default = ISLOW + fancy upsampling (what Pillow/OpenCV use); also -nosmooth
   libjpeg 9e (C API)            built by tools.py (downloaded from ijg.org); default and -nosmooth
   stb_image                     stb_image.h, downloaded by tools.py
-  Pillow 9.0.1                  Image.open(BytesIO).load()           (libjpeg-turbo underneath)
-  OpenCV 4.7                    cv2.imdecode, cv2.setNumThreads(1)   (libjpeg-turbo underneath)
+  Pillow                        Image.open(BytesIO).load()           (libjpeg-turbo underneath)
+  OpenCV                        cv2.imdecode, cv2.setNumThreads(1)   (libjpeg-turbo underneath)
   FFmpeg                        its own mjpeg decoder, -threads 1, many loops of one image
   zune-jpeg 0.4                 Rust, its own decoder with run-time SIMD (bench_zune/), RGB output
   Go image/jpeg                 Go's standard library (bench_go/), YCbCr converted to RGBA with image/draw
@@ -37,7 +39,13 @@ def run(cmd, **kw):
 def parse(out):
     m = re.search(r"(\d+)x(\d+) ms=([\d.]+) mpx_s=([\d.]+) decodes=(\d+) elapsed=([\d.]+) uJ_per_decode=([-\d.]+)", out)
     if not m: return None
-    return dict(w=int(m[1]), h=int(m[2]), ms=float(m[3]), mpx_s=float(m[4]), n=int(m[5]), uj=float(m[7]))
+    r = dict(w=int(m[1]), h=int(m[2]), ms=float(m[3]), mpx_s=float(m[4]), n=int(m[5]), uj=float(m[7]))
+    b = re.search(r"per_batch=(\d+) batches_ms=([\d.,]+)", out)   # every batch, in the order measured
+    if b:
+        v = [float(x) for x in b[2].split(",")]; srt = sorted(v)
+        r.update(per_batch=int(b[1]), batches_ms=v, min_ms=srt[0], max_ms=srt[-1],
+                 p10_ms=srt[int(0.1 * (len(srt) - 1))], p90_ms=srt[int(0.9 * (len(srt) - 1))])
+    return r
 
 PERF_OUT = f"{SCR}/perf_stat.txt"
 def pinned(cmd):
@@ -93,23 +101,25 @@ def ffmpeg_bench(path, w, h):
     data = open(path, "rb").read()
     n_big = max(20, min(400, int(3e8 // (w * h))))     # ~0.3 Gpixel of work
     n_small = n_big // 4
-    times = {}
+    times, clks = {}, {}
     for n in (n_small, n_big):
         fn = f"{SCR}/ffmpeg_{n}.mjpg"
         with open(fn, "wb") as f:
             for _ in range(n): f.write(data)
-        best = 1e9
+        best, best_clk = 1e9, None
         for _ in range(3):
             t0 = time.perf_counter()
             r = run(pinned(["ffmpeg", "-hide_banner", "-loglevel", "error", "-threads", "1", "-f", "mjpeg",
                             "-i", fn, "-pix_fmt", "rgb24", "-f", "null", "-"]))   # RGB out, like the others
-            best = min(best, time.perf_counter() - t0)
-            clk = ghz()
+            dt = time.perf_counter() - t0
+            clk = ghz()                                  # sampled right after this trial
             if r.returncode: return None
-        times[n] = best
+            if dt < best: best, best_clk = dt, clk       # the clock goes with the trial that is kept
+        times[n], clks[n] = best, best_clk
         os.remove(fn)
     per = (times[n_big] - times[n_small]) / (n_big - n_small)
-    return dict(w=w, h=h, ms=per * 1e3, mpx_s=w * h / per / 1e6, n=n_big, uj=-1, ghz=clk)
+    # (before 2026-10-10 the clock of the last trial was returned, whichever trial was fastest)
+    return dict(w=w, h=h, ms=per * 1e3, mpx_s=w * h / per / 1e6, n=n_big, uj=-1, ghz=clks[n_big])
 
 def main():
     want = os.environ.get("BENCH_POWER_PROFILE")
@@ -147,6 +157,7 @@ def bench(prof):
     if "rtl" in old: res["rtl"] = old["rtl"]      # keep bench_fpga.py's clock counts
     res["power_profile"] = prof
     res["date"] = time.strftime("%Y-%m-%d")
+    res["meta"] = tools.meta(IMAGES, CORE, prof)
     for name, path in IMAGES:
         w, h = Image.open(path).size
         r = res["results"].get(name, {}) if only else {}

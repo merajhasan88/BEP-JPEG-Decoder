@@ -1,0 +1,722 @@
+{
+ "cpu": "Architecture:                            x86_64\nCPU op-mode(s):                          32-bit, 64-bit\nAddress sizes:                           39 bits physical, 48 bits virtual\nByte Order:                              Little Endian\nCPU(s):                                  8\nOn-line CPU(s) list:                     0-7\nVendor ID:                               GenuineIntel\nModel name:                              Intel(R) Core(TM) i7-8550U CPU @ 1.80GHz\nCPU family:                              6\nModel:                                   142\nThread(s) per core:                      2\nCore(s) per socket:                      4\nSocket(s):                               1\nStepping:                                10\nCPU max MHz:                             4000.0000\nCPU min MHz:                             400.0000\nBogoMIPS:                                3999.93\nFlags:                                   fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush dts acpi mmx fxsr sse sse2 ss ht tm pbe syscall nx pdpe1gb rdtscp lm constant_tsc art arch_perfmon pebs bts rep_good nopl xtopology nonstop_tsc cpuid aperfmperf pni pclmulqdq dtes64 monitor ds_cpl vmx est tm2 ssse3 sdbg fma cx16 xtpr pdcm pcid sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand lahf_lm abm 3dnowprefetch cpuid_fault epb pti ssbd ibrs ibpb stibp tpr_shadow flexpriority ept vpid ept_ad fsgsbase tsc_adjust bmi1 avx2 smep bmi2 erms invpcid mpx rdseed adx smap clflushopt intel_pt xsaveopt xsavec xgetbv1 xsaves dtherm ida arat pln pts hwp hwp_notify hwp_act_window hwp_epp vnmi md_clear flush_l1d arch_capabilities ibpb_exit_to_user\nVirtualization:                          VT-x\nL1d cache:                               128 KiB (4 instances)\nL1i cache:                               128 KiB (4 instances)\nL2 cache:                                1 MiB (4 instances)\nL3 cache:                                8 MiB (1 instance)\nNUMA node(s):                            1\nNUMA node0 CPU(s):                       0-7\nVulnerability Gather data sampling:      Mitigation; Microcode\nVulnerability Indirect target selection: Not affected\nVulnerability Itlb multihit:             KVM: Mitigation: VMX disabled\nVulnerability L1tf:                      Mitigation; PTE Inversion; VMX conditional cache flushes, SMT vulnerable\nVulnerability Mds:                       Mitigation; Clear CPU buffers; SMT vulnerable\nVulnerability Meltdown:                  Mitigation; PTI\nVulnerability Mmio stale data:           Mitigation; Clear CPU buffers; SMT vulnerable\nVulnerability Reg file data sampling:    Not affected\nVulnerability Retbleed:                  Mitigation; IBRS\nVulnerability Spec rstack overflow:      Not affected\nVulnerability Spec store bypass:         Mitigation; Speculative Store Bypass disabled via prctl\nVulnerability Spectre v1:                Mitigation; usercopy/swapgs barriers and __user pointer sanitization\nVulnerability Spectre v2:                Mitigation; IBRS; IBPB conditional; STIBP conditional; RSB filling; PBRSB-eIBRS Not affected; BHI Not affected\nVulnerability Srbds:                     Mitigation; Microcode\nVulnerability Tsa:                       Not affected\nVulnerability Tsx async abort:           Not affected\nVulnerability Vmscape:                   Mitigation; IBPB before exit to userspace\n",
+ "core": "3",
+ "results": {
+  "adp_64x64_q25_420": {
+   "libjpeg-turbo (fancy)": {
+    "w": 64,
+    "h": 64,
+    "ms": 0.0176,
+    "mpx_s": 232.46,
+    "n": 85575,
+    "uj": 333.0,
+    "ghz": 3.637
+   },
+   "libjpeg-turbo (nosmooth)": {
+    "w": 64,
+    "h": 64,
+    "ms": 0.0202,
+    "mpx_s": 202.33,
+    "n": 75376,
+    "uj": 372.6,
+    "ghz": 3.624
+   },
+   "libjpeg 9e (fancy)": {
+    "w": 64,
+    "h": 64,
+    "ms": 0.0358,
+    "mpx_s": 114.36,
+    "n": 44240,
+    "uj": 682.6,
+    "ghz": 3.713
+   },
+   "libjpeg 9e (nosmooth)": {
+    "w": 64,
+    "h": 64,
+    "ms": 0.0231,
+    "mpx_s": 177.18,
+    "n": 64752,
+    "uj": 444.4,
+    "ghz": 3.704
+   },
+   "stb_image": {
+    "w": 64,
+    "h": 64,
+    "ms": 0.0264,
+    "mpx_s": 155.38,
+    "n": 56925,
+    "uj": 513.7,
+    "ghz": 3.727
+   },
+   "Pillow": {
+    "w": 64,
+    "h": 64,
+    "ms": 0.0813,
+    "mpx_s": 50.4,
+    "n": 19296,
+    "uj": 1612.6,
+    "ghz": 3.652
+   },
+   "OpenCV": {
+    "w": 64,
+    "h": 64,
+    "ms": 0.035,
+    "mpx_s": 116.88,
+    "n": 43520,
+    "uj": 634.5,
+    "ghz": 3.661
+   },
+   "FFmpeg mjpeg": {
+    "w": 64,
+    "h": 64,
+    "ms": 0.03208236665765677,
+    "mpx_s": 127.67137922546151,
+    "n": 400,
+    "uj": -1,
+    "ghz": 3.712
+   },
+   "Python reference model": {
+    "w": 64,
+    "h": 64,
+    "ms": 19.4646,
+    "mpx_s": 0.21,
+    "n": 54,
+    "uj": 397317.5,
+    "ghz": 3.76
+   }
+  },
+  "board_352x32_q6_420": {
+   "libjpeg-turbo (fancy)": {
+    "w": 352,
+    "h": 32,
+    "ms": 0.0233,
+    "mpx_s": 483.74,
+    "n": 68272,
+    "uj": 479.6,
+    "ghz": 3.821
+   },
+   "libjpeg-turbo (nosmooth)": {
+    "w": 352,
+    "h": 32,
+    "ms": 0.0236,
+    "mpx_s": 477.62,
+    "n": 66576,
+    "uj": 453.4,
+    "ghz": 3.86
+   },
+   "libjpeg 9e (fancy)": {
+    "w": 352,
+    "h": 32,
+    "ms": 0.0718,
+    "mpx_s": 156.79,
+    "n": 20300,
+    "uj": 1398.9,
+    "ghz": 3.806
+   },
+   "libjpeg 9e (nosmooth)": {
+    "w": 352,
+    "h": 32,
+    "ms": 0.0419,
+    "mpx_s": 269.12,
+    "n": 35742,
+    "uj": 887.0,
+    "ghz": 3.765
+   },
+   "stb_image": {
+    "w": 352,
+    "h": 32,
+    "ms": 0.0544,
+    "mpx_s": 207.12,
+    "n": 28005,
+    "uj": 1021.4,
+    "ghz": 3.808
+   },
+   "Pillow": {
+    "w": 352,
+    "h": 32,
+    "ms": 0.0844,
+    "mpx_s": 133.46,
+    "n": 17918,
+    "uj": 1825.7,
+    "ghz": 3.686
+   },
+   "OpenCV": {
+    "w": 352,
+    "h": 32,
+    "ms": 0.0445,
+    "mpx_s": 253.24,
+    "n": 34714,
+    "uj": 962.8,
+    "ghz": 3.653
+   },
+   "FFmpeg mjpeg": {
+    "w": 352,
+    "h": 32,
+    "ms": 0.04705615334387403,
+    "mpx_s": 239.37358240240425,
+    "n": 400,
+    "uj": -1,
+    "ghz": 3.5
+   },
+   "Python reference model": {
+    "w": 352,
+    "h": 32,
+    "ms": 49.9507,
+    "mpx_s": 0.23,
+    "n": 20,
+    "uj": 1431463.1,
+    "ghz": 3.592
+   }
+  },
+  "scr_320x240_q90_420": {
+   "libjpeg-turbo (fancy)": {
+    "w": 320,
+    "h": 240,
+    "ms": 0.2778,
+    "mpx_s": 276.42,
+    "n": 5490,
+    "uj": 5477.6,
+    "ghz": 3.735
+   },
+   "libjpeg-turbo (nosmooth)": {
+    "w": 320,
+    "h": 240,
+    "ms": 0.2696,
+    "mpx_s": 284.86,
+    "n": 5505,
+    "uj": 5586.0,
+    "ghz": 3.763
+   },
+   "libjpeg 9e (fancy)": {
+    "w": 320,
+    "h": 240,
+    "ms": 0.7391,
+    "mpx_s": 103.92,
+    "n": 2000,
+    "uj": 15273.8,
+    "ghz": 3.718
+   },
+   "libjpeg 9e (nosmooth)": {
+    "w": 320,
+    "h": 240,
+    "ms": 0.501,
+    "mpx_s": 153.3,
+    "n": 3024,
+    "uj": 8967.1,
+    "ghz": 3.91
+   },
+   "stb_image": {
+    "w": 320,
+    "h": 240,
+    "ms": 0.6227,
+    "mpx_s": 123.33,
+    "n": 2505,
+    "uj": 12224.4,
+    "ghz": 3.73
+   },
+   "Pillow": {
+    "w": 320,
+    "h": 240,
+    "ms": 0.3962,
+    "mpx_s": 193.82,
+    "n": 3900,
+    "uj": 7163.1,
+    "ghz": 3.843
+   },
+   "OpenCV": {
+    "w": 320,
+    "h": 240,
+    "ms": 0.3866,
+    "mpx_s": 198.64,
+    "n": 4096,
+    "uj": 7122.1,
+    "ghz": 3.893
+   },
+   "FFmpeg mjpeg": {
+    "w": 320,
+    "h": 240,
+    "ms": 0.31515695666409255,
+    "mpx_s": 243.68810009120836,
+    "n": 400,
+    "uj": -1,
+    "ghz": 3.886
+   },
+   "Python reference model": null
+  },
+  "donald_2048x1365": {
+   "libjpeg-turbo (fancy)": {
+    "w": 2048,
+    "h": 1365,
+    "ms": 6.9203,
+    "mpx_s": 403.96,
+    "n": 221,
+    "uj": 127775.8,
+    "ghz": 3.894
+   },
+   "libjpeg-turbo (nosmooth)": {
+    "w": 2048,
+    "h": 1365,
+    "ms": 6.8712,
+    "mpx_s": 406.85,
+    "n": 221,
+    "uj": 123569.1,
+    "ghz": 3.885
+   },
+   "libjpeg 9e (fancy)": {
+    "w": 2048,
+    "h": 1365,
+    "ms": 21.7045,
+    "mpx_s": 128.8,
+    "n": 70,
+    "uj": 404538.2,
+    "ghz": 3.886
+   },
+   "libjpeg 9e (nosmooth)": {
+    "w": 2048,
+    "h": 1365,
+    "ms": 14.1492,
+    "mpx_s": 197.58,
+    "n": 108,
+    "uj": 259907.9,
+    "ghz": 3.891
+   },
+   "stb_image": {
+    "w": 2048,
+    "h": 1365,
+    "ms": 14.3475,
+    "mpx_s": 194.84,
+    "n": 108,
+    "uj": 235527.3,
+    "ghz": 3.894
+   },
+   "Pillow": {
+    "w": 2048,
+    "h": 1365,
+    "ms": 7.8697,
+    "mpx_s": 355.22,
+    "n": 192,
+    "uj": 146157.5,
+    "ghz": 3.899
+   },
+   "OpenCV": {
+    "w": 2048,
+    "h": 1365,
+    "ms": 16.0694,
+    "mpx_s": 173.97,
+    "n": 96,
+    "uj": 288089.0,
+    "ghz": 3.842
+   },
+   "FFmpeg mjpeg": {
+    "w": 2048,
+    "h": 1365,
+    "ms": 19.991796938282075,
+    "mpx_s": 139.8333530812775,
+    "n": 107,
+    "uj": -1,
+    "ghz": 3.916
+   },
+   "Python reference model": null
+  },
+  "portrait_1944x2592_444": {
+   "libjpeg-turbo (fancy)": {
+    "w": 1944,
+    "h": 2592,
+    "ms": 17.7735,
+    "mpx_s": 283.5,
+    "n": 91,
+    "uj": 381125.3,
+    "ghz": 3.772
+   },
+   "libjpeg-turbo (nosmooth)": {
+    "w": 1944,
+    "h": 2592,
+    "ms": 16.7887,
+    "mpx_s": 300.13,
+    "n": 91,
+    "uj": 323465.4,
+    "ghz": 3.87
+   },
+   "libjpeg 9e (fancy)": {
+    "w": 1944,
+    "h": 2592,
+    "ms": 35.7405,
+    "mpx_s": 140.98,
+    "n": 45,
+    "uj": 664604.7,
+    "ghz": 3.904
+   },
+   "libjpeg 9e (nosmooth)": {
+    "w": 1944,
+    "h": 2592,
+    "ms": 35.9912,
+    "mpx_s": 140.0,
+    "n": 45,
+    "uj": 693014.4,
+    "ghz": 3.835
+   },
+   "stb_image": {
+    "w": 1944,
+    "h": 2592,
+    "ms": 48.6332,
+    "mpx_s": 103.61,
+    "n": 35,
+    "uj": 1015329.4,
+    "ghz": 3.674
+   },
+   "Pillow": {
+    "w": 1944,
+    "h": 2592,
+    "ms": 21.6392,
+    "mpx_s": 232.86,
+    "n": 72,
+    "uj": 416462.2,
+    "ghz": 3.6
+   },
+   "OpenCV": {
+    "w": 1944,
+    "h": 2592,
+    "ms": 37.066,
+    "mpx_s": 135.94,
+    "n": 44,
+    "uj": 624931.8,
+    "ghz": 3.408
+   },
+   "FFmpeg mjpeg": {
+    "w": 1944,
+    "h": 2592,
+    "ms": 38.18700657777501,
+    "mpx_s": 131.9518980818106,
+    "n": 59,
+    "uj": -1,
+    "ghz": 3.659
+   },
+   "Python reference model": null
+  },
+  "adapter_3120x4160_422": {
+   "libjpeg-turbo (fancy)": {
+    "w": 3120,
+    "h": 4160,
+    "ms": 65.1058,
+    "mpx_s": 199.36,
+    "n": 24,
+    "uj": 1089479.8,
+    "ghz": 3.478
+   },
+   "libjpeg-turbo (nosmooth)": {
+    "w": 3120,
+    "h": 4160,
+    "ms": 66.2894,
+    "mpx_s": 195.8,
+    "n": 24,
+    "uj": 1098881.8,
+    "ghz": 3.518
+   },
+   "libjpeg 9e (fancy)": {
+    "w": 3120,
+    "h": 4160,
+    "ms": 135.2801,
+    "mpx_s": 95.94,
+    "n": 15,
+    "uj": 2284108.7,
+    "ghz": 3.756
+   },
+   "libjpeg 9e (nosmooth)": {
+    "w": 3120,
+    "h": 4160,
+    "ms": 119.0941,
+    "mpx_s": 108.98,
+    "n": 15,
+    "uj": 2056501.1,
+    "ghz": 3.775
+   },
+   "stb_image": {
+    "w": 3120,
+    "h": 4160,
+    "ms": 137.0568,
+    "mpx_s": 94.7,
+    "n": 15,
+    "uj": 2314044.3,
+    "ghz": 3.756
+   },
+   "Pillow": {
+    "w": 3120,
+    "h": 4160,
+    "ms": 85.8914,
+    "mpx_s": 151.11,
+    "n": 18,
+    "uj": 1464958.7,
+    "ghz": 3.83
+   },
+   "OpenCV": {
+    "w": 3120,
+    "h": 4160,
+    "ms": 98.4428,
+    "mpx_s": 131.85,
+    "n": 16,
+    "uj": 1665675.7,
+    "ghz": 3.809
+   },
+   "FFmpeg mjpeg": {
+    "w": 3120,
+    "h": 4160,
+    "ms": 70.42640922231334,
+    "mpx_s": 184.2945017831148,
+    "n": 23,
+    "uj": -1,
+    "ghz": 3.869
+   },
+   "Python reference model": null
+  },
+  "phone_4000x3000_light": {
+   "libjpeg-turbo (fancy)": {
+    "w": 4000,
+    "h": 3000,
+    "ms": 54.5065,
+    "mpx_s": 220.16,
+    "n": 30,
+    "uj": 918165.8,
+    "ghz": 3.826
+   },
+   "libjpeg-turbo (nosmooth)": {
+    "w": 4000,
+    "h": 3000,
+    "ms": 53.913,
+    "mpx_s": 222.58,
+    "n": 30,
+    "uj": 917077.3,
+    "ghz": 3.844
+   },
+   "libjpeg 9e (fancy)": {
+    "w": 4000,
+    "h": 3000,
+    "ms": 139.0477,
+    "mpx_s": 86.3,
+    "n": 15,
+    "uj": 2364573.3,
+    "ghz": 3.799
+   },
+   "libjpeg 9e (nosmooth)": {
+    "w": 4000,
+    "h": 3000,
+    "ms": 121.2286,
+    "mpx_s": 98.99,
+    "n": 15,
+    "uj": 2069403.9,
+    "ghz": 3.71
+   },
+   "stb_image": {
+    "w": 4000,
+    "h": 3000,
+    "ms": 109.3017,
+    "mpx_s": 109.79,
+    "n": 15,
+    "uj": 1863044.5,
+    "ghz": 3.898
+   },
+   "Pillow": {
+    "w": 4000,
+    "h": 3000,
+    "ms": 79.0101,
+    "mpx_s": 151.88,
+    "n": 20,
+    "uj": 1276565.4,
+    "ghz": 3.822
+   },
+   "OpenCV": {
+    "w": 4000,
+    "h": 3000,
+    "ms": 91.6442,
+    "mpx_s": 130.94,
+    "n": 18,
+    "uj": 1442775.9,
+    "ghz": 3.713
+   },
+   "FFmpeg mjpeg": {
+    "w": 4000,
+    "h": 3000,
+    "ms": 67.42410563157664,
+    "mpx_s": 177.9778891776661,
+    "n": 25,
+    "uj": -1,
+    "ghz": 3.921
+   },
+   "Python reference model": null
+  },
+  "phone_4000x3000_dense": {
+   "libjpeg-turbo (fancy)": {
+    "w": 4000,
+    "h": 3000,
+    "ms": 70.0825,
+    "mpx_s": 171.23,
+    "n": 24,
+    "uj": 1072649.5,
+    "ghz": 3.772
+   },
+   "libjpeg-turbo (nosmooth)": {
+    "w": 4000,
+    "h": 3000,
+    "ms": 73.3854,
+    "mpx_s": 163.52,
+    "n": 21,
+    "uj": 1061314.4,
+    "ghz": 3.636
+   },
+   "libjpeg 9e (fancy)": {
+    "w": 4000,
+    "h": 3000,
+    "ms": 163.8594,
+    "mpx_s": 73.23,
+    "n": 15,
+    "uj": 2437929.2,
+    "ghz": 3.774
+   },
+   "libjpeg 9e (nosmooth)": {
+    "w": 4000,
+    "h": 3000,
+    "ms": 135.1195,
+    "mpx_s": 88.81,
+    "n": 15,
+    "uj": 2027424.0,
+    "ghz": 3.759
+   },
+   "stb_image": {
+    "w": 4000,
+    "h": 3000,
+    "ms": 147.4501,
+    "mpx_s": 81.38,
+    "n": 15,
+    "uj": 2214024.3,
+    "ghz": 3.738
+   },
+   "Pillow": {
+    "w": 4000,
+    "h": 3000,
+    "ms": 96.4966,
+    "mpx_s": 124.36,
+    "n": 16,
+    "uj": 1438442.4,
+    "ghz": 3.81
+   },
+   "OpenCV": {
+    "w": 4000,
+    "h": 3000,
+    "ms": 108.3168,
+    "mpx_s": 110.79,
+    "n": 14,
+    "uj": 1733354.8,
+    "ghz": 3.685
+   },
+   "FFmpeg mjpeg": {
+    "w": 4000,
+    "h": 3000,
+    "ms": 93.24238873676605,
+    "mpx_s": 128.6968315867301,
+    "n": 25,
+    "uj": -1,
+    "ghz": 3.677
+   },
+   "Python reference model": null
+  }
+ },
+ "rtl": {
+  "adp_64x64_q25_420": {
+   "MCU order, replication, RGB": {
+    "cycles": 56410,
+    "pixels": 4096,
+    "err": "000"
+   },
+   "FAST, MCU order, replication, RGB": {
+    "cycles": 5780,
+    "pixels": 4096,
+    "err": "000"
+   }
+  },
+  "board_352x32_q6_420": {
+   "MCU order, replication, RGB": {
+    "cycles": 144288,
+    "pixels": 11264,
+    "err": "000"
+   },
+   "FAST, MCU order, replication, RGB": {
+    "cycles": 13200,
+    "pixels": 11264,
+    "err": "000"
+   }
+  },
+  "scr_320x240_q90_420": {
+   "MCU order, replication, RGB": {
+    "cycles": 1109999,
+    "pixels": 76800,
+    "err": "000"
+   },
+   "FAST, MCU order, replication, RGB": {
+    "cycles": 96450,
+    "pixels": 76800,
+    "err": "000"
+   }
+  },
+  "donald_2048x1365": {
+   "MCU order, replication, RGB": {
+    "cycles": 37626235,
+    "pixels": 2795520,
+    "err": "000"
+   },
+   "FAST, MCU order, replication, RGB": {
+    "cycles": 2847577,
+    "pixels": 2795520,
+    "err": "000"
+   }
+  },
+  "portrait_1944x2592_444": {
+   "MCU order, replication, RGB": {
+    "cycles": 105931461,
+    "pixels": 5038848,
+    "err": "000"
+   },
+   "FAST, MCU order, replication, RGB": {
+    "cycles": 8392001,
+    "pixels": 5038848,
+    "err": "000"
+   }
+  },
+  "adapter_3120x4160_422": {
+   "MCU order, replication, RGB": {
+    "cycles": 231934797,
+    "pixels": 12979200,
+    "err": "000"
+   },
+   "FAST, MCU order, replication, RGB": {
+    "cycles": 19234181,
+    "pixels": 12979200,
+    "err": "000"
+   }
+  },
+  "phone_4000x3000_light": {
+   "MCU order, replication, RGB": {
+    "cycles": 193149699,
+    "pixels": 12000000,
+    "err": "000"
+   },
+   "FAST, MCU order, replication, RGB": {
+    "cycles": 19301225,
+    "pixels": 12000000,
+    "err": "000"
+   }
+  },
+  "phone_4000x3000_dense": {
+   "MCU order, replication, RGB": {
+    "cycles": 217407477,
+    "pixels": 12000000,
+    "err": "000"
+   },
+   "FAST, MCU order, replication, RGB": {
+    "cycles": 26948769,
+    "pixels": 12000000,
+    "err": "000"
+   }
+  }
+ },
+ "power_profile": "performance",
+ "date": "2026-09-30"
+}

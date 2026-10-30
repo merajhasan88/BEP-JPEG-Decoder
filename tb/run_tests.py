@@ -7,7 +7,8 @@ with and without 30 % random input stalls / output back-pressure.
                  RGB output is also compared with Pillow's own decode of the file.
 Raster configurations must deliver pixels in strict raster order.  Images that do not fit the
 row buffer of a configuration must end with err = ERR_WIDTH and no pixels.  Files the decoder
-does not support (progressive) must terminate with a non-zero err.
+does not support (progressive) must terminate with a non-zero err, as must the output formats the
+model refuses for an image (YCbCr or Y output of an RGB-coded image).
 usage: run_tests.py [--quick] [--configs=a,b] [image.jpg ...]      (default: tb/corpus/*.jpg)"""
 import sys, os, re, subprocess, glob
 import numpy as np
@@ -87,10 +88,13 @@ def main():
             for prof in ("box", "fancy"):
                 for fmt in FMTS:
                     g = os.path.join(HERE, "golden", f"{b}.{prof}.{fmt}.pnm")
-                    if not os.path.exists(g) or os.path.getmtime(g) < os.path.getmtime(img):
-                        out = G.Decoder(data, upsample=prof, cc="turbo" if prof == "fancy" else "libjpeg9", out=fmt).run()
-                        open(g, "wb").write(out)
-                    goldens[(prof, fmt)] = g
+                    try:
+                        if not os.path.exists(g) or os.path.getmtime(g) < os.path.getmtime(img):
+                            out = G.Decoder(data, upsample=prof, cc="turbo" if prof == "fancy" else "libjpeg9", out=fmt).run()
+                            open(g, "wb").write(out)
+                        goldens[(prof, fmt)] = g
+                    except ValueError:        # e.g. YCbCr or Y output of an RGB image: the decoder flags it
+                        goldens[(prof, fmt)] = None
         for cfg, cv in configs.items():
             raster, fancy, rb, has_rgb = cv[:4]
             fast = len(cv) > 4 and cv[4]
@@ -104,10 +108,14 @@ def main():
                     if unsupported: expect = "error"
                     elif rb is not None and (not rowbuf_fits_fast(data, fancy, fmt, rb) if fast else rowbuf_need(data, fancy, fmt) > rb):
                         expect = "width"; cmd += ["--expect-err", "%x" % ERR_WIDTH]
+                    elif goldens[("fancy" if fancy else "box", fmt)] is None:
+                        expect = "error"                                      # an unsupported format of this image
                     else:
-                        gfmt = fmt if (has_rgb or fmt != "rgb") else "ycbcr"   # RGB_OUT=0: rgb -> YCbCr
+                        prof = "fancy" if fancy else "box"
+                        rgb_img = goldens[(prof, "ycbcr")] is None            # an RGB image: rgb = its components
+                        gfmt = fmt if (has_rgb or fmt != "rgb" or rgb_img) else "ycbcr"   # RGB_OUT=0: rgb -> YCbCr
                         if gfmt != fmt: cmd[cmd.index("--fmt") + 1] = fmt     # still request FMT_RGB ...
-                        cmd += ["--golden", goldens[("fancy" if fancy else "box", gfmt)]]
+                        cmd += ["--golden", goldens[(prof, gfmt)]]
                         if gfmt != fmt: cmd += ["--as-ycbcr"]                 # ... and compare as YCbCr
                     r = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
                     log = r.stderr

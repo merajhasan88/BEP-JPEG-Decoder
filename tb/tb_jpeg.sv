@@ -52,6 +52,13 @@ module tb_jpeg;
     .px_eol(px_eol), .img_w(img_w), .img_h(img_h), .frame_start(frame_start),
     .frame_done(frame_done), .err(err));
 
+  // interface assertions (jpeg_checker.sv): a violation ends the run with $fatal
+  jpeg_checker #(.NPIX(NPIX)) u_chk (
+    .clk(clk), .rst(rst), .in_valid(in_valid), .in_ready(in_ready), .in_last(in_last), .in_data(in_data),
+    .out_fmt(out_fmt), .px_valid(px_valid), .px_ready(px_ready), .px_x(px_x), .px_y(px_y), .px_n(px_n),
+    .px_c0(px_c0), .px_c1(px_c1), .px_c2(px_c2), .px_sof(px_sof), .px_eol(px_eol), .img_w(img_w),
+    .img_h(img_h), .frame_start(frame_start), .frame_done(frame_done), .err(err));
+
   always #5 clk = ~clk;
 
   // ------------------------------------------------------------------ helpers
