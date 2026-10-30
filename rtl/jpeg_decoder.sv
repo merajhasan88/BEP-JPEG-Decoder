@@ -30,7 +30,7 @@
 //   FANCY_UPSAMPLE libjpeg-turbo's triangle-filter chroma upsampling (the default of Pillow and
 //                  OpenCV) instead of sample replication.  Requires RASTER_OUT = 1.
 //   CC_TURBO       YCbCr->RGB constants of libjpeg-turbo (Pillow, OpenCV) instead of libjpeg 9.
-//   RGB_OUT        0 leaves the YCbCr->RGB converter out (~280 LEs) for consumers that only want
+//   RGB_OUT        0 leaves the YCbCr->RGB converter out (86 LEs in the EP2C5 raster build) for consumers that only want
 //                  YCbCr or luma; FMT_RGB then delivers YCbCr.
 //   CHECKS         1: header/table validation (see jpeg_parser: tables complete and legal before
 //                     use, segment lengths, component selectors, RSTn sequence).  0 saves ~100

@@ -85,7 +85,7 @@ power-saver comparison cite the runs of 2026-09-30 on the earlier image set (don
    408 photos/s on the 24 photo files. Three assumptions go with these rates: the counts are active
    decode clocks (the gated clocks leave out the waits for the 1 Mbaud UART); the 15 lanes decoded
    copies of one file sent once, not 15 distinct files; and 408 is a schedule of the 24 single-file
-   times on 15 lanes, longest first (371.5 in file order, 470.8 with ideal balance). Feeding 372
+   times on 15 lanes, longest first (322-389 in the other orders tried, 470.8 with ideal balance). Feeding 372
    adapter-sized photos/s takes about 1.3 GB/s of JPEG in and 14.5 GB/s of RGB out. The laptop's whole CPU, measured on the same 24 files
    (`bench_multicore.py`, `bench_multicore_2026-10-12.json`: three runs each; libjpeg-turbo -nosmooth, one
    worker per logical CPU, performance profile): 21.1 photos/s on one core (20.9-22.9, at 3.57-3.82 GHz),
