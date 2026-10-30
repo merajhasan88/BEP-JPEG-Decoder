@@ -231,12 +231,12 @@ only, or no SOI) produces no frame.
 | `FANCY_UPSAMPLE` | 0 | libjpeg-turbo's triangle-filter chroma upsampling (Pillow/OpenCV default) instead of replication; needs `RASTER_OUT=1` |
 | `CC_TURBO` | 0 | YCbCr->RGB constants of libjpeg-turbo (`FIX(0.34414)`=22554) instead of libjpeg 9 (22553); differs for 59 of 65,536 (Cb,Cr) pairs |
 | `RGB_OUT` | 1 | 0 removes the colour converter (86 LEs in the EP2C5 raster build) for YCbCr/luma consumers; `FMT_RGB` then delivers YCbCr |
-| `CHECKS` | 1 | header and table validation (above); 0 leaves it out (the checks took ~100 LEs on the EP2C5 when measured on 2026-10-01; more were added on 2026-10-10) |
+| `CHECKS` | 1 | header and table validation (above); 0 leaves it out: 96 LEs less on the EP2C5 (compact MCU-order build: 3,364 instead of 3,460 LEs, 2026-10-30) |
 | `ROWBUF_Y_BYTES`, `ROWBUF_C_BYTES` | 0 | `FAST=1` with `RASTER_OUT=1`: separate luma / chroma row buffers (0 = derived from `ROWBUF_BYTES`) |
 
 Row-buffer bytes (`ROWBUF_BYTES`) needed per 16 pixels of image width (`FMT_Y` stores luma only). The fast core
 keeps one RAM per component - by default half of `ROWBUF_BYTES` for luma and a quarter for each chroma
-component (`ROWBUF_Y_BYTES` / `ROWBUF_C_BYTES` set them directly) - so it needs more:
+component (`ROWBUF_Y_BYTES` / `ROWBUF_C_BYTES` set them directly) - so it needs the same or more, up to twice as much:
 
 | sampling | compact core | with `FANCY_UPSAMPLE` | `FMT_Y` | fast core | with `FANCY_UPSAMPLE` | `FMT_Y` |
 |---|---:|---:|---:|---:|---:|---:|
