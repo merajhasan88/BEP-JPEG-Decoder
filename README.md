@@ -384,9 +384,7 @@ BEP-JPEG grew out of Meraj Hasan's 2022 JPEG decoder in SystemVerilog, a simulat
 from the ITU-T T.81 standard (marker parsing, quantisation and Huffman tables); those first
 commits are kept in this repository's history (tag `original-2023`). The synthesizable decoder,
 its tests and the board builds were developed from 2026 on; the full development history,
-including the timing-closure work on the EP2C5, is on the `BEP-JPEG-development` branch. Until
-2026-10-30 the project was called BEBCL-JPEG (Bit-Exact, Backwards-Compatible, Least clocks-per-pixel); the
-old name remains in dated records.
+including the timing-closure work on the EP2C5, is on the `BEP-JPEG-development` branch.
 
 ## Acknowledgements
 
