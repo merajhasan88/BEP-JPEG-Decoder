@@ -16,7 +16,7 @@ there without the owner's go-ahead and a cost given first. The vendor-neutral pa
 | `f2_core.sv` | the CL's logic between the shell's ports and the memory: NL lanes (each with registered job inputs, a register slice on its memory port and its own reset register), `f2_regs` on OCL, `f2_pcis` on PCIS, and `f2_axi_mux` onto one AXI4 port (on F2: the DDR4). Vendor-neutral |
 | `f2_axi_mux.sv` | NM AXI4 masters onto one slave: round-robin AR and AW (the grant registered one clock ahead), the W bursts in the order of their addresses (AXI4 has no WID), R and B routed back by ID (the master's index); the slave may reorder answers across IDs and interleave read bursts |
 | `f2_pcis.sv` | the host's memory port: the shell's PCIS (BAR4, 512-bit AXI4) as one master of the multiplexer - addresses aligned down to 64 bytes (the byte strobes and byte lanes carry the alignment) and reduced to 64 GiB, the shell's IDs returned in order from two FIFOs; until the memory is ready every request is answered here with SLVERR (reads: zeros) and counted, so no access can hang the shell's 8 us timeout |
-| `f2_slices.sv` | register slices (every valid, data and ready leaves a flip-flop) for AXI4 and AXI-Lite, and a plain pipeline |
+| `f2_slices.sv` | register slices (every valid, data and ready leaves a flip-flop) for AXI4 and AXI-Lite, a plain pipeline, and links with credits for long distances (every wire between the two halves leaves a register and enters one; OCL and PCIS cross the dies over them) |
 | `cl_jpeg/` | the CL for AWS's HDK (folder name = CL name = top module, as the HDK requires): `design/cl_jpeg.sv` (the shell's ports from the HDK's `cl_ports.vh`, included, not copied; AWS's `sh_ddr` wired as in AWS's examples; every unused interface idle), `design/cl_id_defines.vh` (PCIe IDs 0xF0A1/0x1D0F, 0x1D51/0xFEDC), `design/cl_jpeg_defines.vh` (the commit stamp), `build/` (our `encrypt.tcl` and `synth_cl_jpeg.tcl` for the HDK's flow, the constraints: placement in SLR1 next to the shell and SLR2 next to the DDR4), `verif/` (AWS's XSIM test), `build_on_aws.sh` (the build on AWS's FPGA Developer AMI), `local_check.tcl` (the free checks on this machine) |
 | `sim/tb_cl.cpp`, `sim/run_cl_tests.py`, `sim/sh_ddr_sim.sv` | the whole CL, its real top level with `cl_ports.vh`, in Verilator: the testbench plays the F2 host and AWS's shell on every port, with the DDR4 as a model behind a stand-in `sh_ddr` (same module name and ports). Below |
 | `sim/tb_mem_lane.cpp` | one lane, a list of jobs back to back, against an AXI4 memory model with random delays and gaps on every channel: every pixel placed by x and y and compared with the golden image, the hash recomputed; the job inputs change and a start is pulsed while a job runs; at done nothing may be outstanding on the memory side |
@@ -188,7 +188,8 @@ dies are not modelled here at all. A local result is therefore a necessary check
 About $2-3 per attempt. The first build reached the end of placement 70 minutes after it started (synthesis 8 min,
 link and opt 12 min, placement 28 min, physical optimisation 21 min): a build whose timing estimate there is clearly
 negative should be stopped at that point instead of routed, which saves about an hour: `build_on_aws.sh` does so
-since 2026-11-03 (its WNS gate).
+since 2026-11-03 (its WNS gate). Running the image needs an f2.6xlarge ($1.98/h) and the F-instance quota of 24 vCPUs
+(8 granted as of 2026-11-03).
 
 ### First build on AWS (2026-11-03)
 
@@ -229,5 +230,48 @@ with its worst path):
 - **7 inside AWS's `sh_ddr`**, its statistics path (-0.635 ns), likely the crowding around it.
 
 The reports, the logs, the analysis (`analysis/failing_buckets.txt`) and the checkpoints after synthesis and after
-physical optimisation are in `/media/developer/HIKSEMI/Vivado/builds/f2_aws_4d1d7b94/`. Running it needs an f2.6xlarge ($1.98/h) and the F-instance quota of 24 vCPUs (8 granted as of
-2026-11-03).
+physical optimisation are in `/media/developer/HIKSEMI/Vivado/builds/f2_aws_4d1d7b94/`.
+
+**The changes after it (not yet built on AWS).** Each failing group above, and what changed:
+- `mem_lane.sv`:
+  - a two-entry register stage on the decoder's input, so `in_valid`, `in_data` and `in_last` are registers and
+    `in_ready` reaches nine flip-flops instead of the 512-bit word, the counters and the read FIFO;
+  - one on its output, with `px_ready` a register (it fans out widely inside the decoder);
+  - the byte count, the room in the output area and in the write FIFO as down-counters with flags;
+  - the write into the FIFO one clock after a beat completes;
+  - the next read burst's length as a register.
+  The lane's clock counts stay within a few dozen clocks of before on the corpus files, and within 30 on the 12 MP
+  photos (4.16 million clocks).
+- `f2_slices.sv`:
+  - `f2_skid` loads its data registers whenever they are free, so a far `s_valid` reaches two flip-flops, not
+    hundreds of enables;
+  - new links with credits (`f2_link_tx/rx`, and AXI4 / AXI-Lite ports over them): the sender sends only with a
+    credit for the receiver's FIFO, and every wire between the two halves leaves a register and enters one (two
+    registers in each half, both ways, so that the placer can spread a long distance over them; a 16-entry FIFO keeps
+    a beat per clock). OCL and PCIS cross from the shell's die to the core over them; the PCIS slice in the core is
+    gone.
+- `f2_core.sv`: the reset arrives on one register and goes on through one register per block.
+- `f2_regs.sv`:
+  - no reset on the job and result registers;
+  - writes take effect one clock after the response;
+  - reads answer three clocks after the address, each lane's word selected first.
+- `f2_axi_mux.sv`: the masters' valids are registered before the round robin.
+- Not changed: the decoder (its Huffman loop failed at -0.325 ns, and its output stall from `px_ready` at about
+  -0.3 ns) and AWS's `sh_ddr`. Placement is the only lever there; whether they pass is the open question of the next
+  build.
+
+The local check of 7b0cc5a (KU5P -2, 15 lanes, post-synthesis estimates at 4.0 ns, against those of 0c688d4, whose
+design files the AWS build used):
+
+| paths | 0c688d4: worst slack, levels | 7b0cc5a: worst slack, levels |
+|---|---|---|
+| all | +0.668 ns, 12 (`rd_left` into the read address) | +1.316 ns, 14 (`wr_addr`'s 64-bit add, 8 of them carry steps) |
+| decoder -> lane wrapper | +1.162 ns, 13 (up to 17) | +2.412 ns, 6 |
+| lane wrapper -> decoder | +1.353 ns, 11 | +2.112 ns, 7 |
+| inside the decoder | +1.415 ns, 9 | +1.404 ns, 8 |
+| glue | +2.033 ns, 7 | +1.933 ns, 10 (the multiplexer into `f2_pcis`) |
+
+These estimates know nothing of placement: on AWS the same paths came out about 1 ns slower after placement than
+this machine's placed estimate. What they show is the depth taken out of the paths that failed. The elaboration of
+the real top level found every cell the placement constraints name. Files:
+`/media/developer/HIKSEMI/Vivado/builds/f2_local_7b0cc5a8/` (`levels_vs_0c688d45/`).
