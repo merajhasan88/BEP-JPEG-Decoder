@@ -178,7 +178,8 @@ Owner: "In parallel (pun intended) lets find a way around Huffman loop limitatio
 - **The owner's plan (2026-11-03): three images, in order.**
   1. **The batch engine on DDR4.**
   2. **Proposal A on DDR4.** Its decoder time per photo is compared with image 1's on the same F2 (owner: "My plan is
-     to compare split 1's decoder time on F2 with split 2's").
+     to compare split 1's decoder time on F2 with split 2's"). The steps, with what split 1 cost and taught:
+     `boards/aws_f2/SPLIT2_STEPS.md`.
   3. **HBM with Proposal A and the batch engine**, one channel per lane.
 
   Why DDR4 first: AWS's DDR4 controller (`sh_ddr`) has to be in every CL anyway, two of AWS's examples wire it the way
