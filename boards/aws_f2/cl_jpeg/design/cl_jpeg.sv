@@ -8,8 +8,10 @@
 //   - Everything else is tied off; no HBM, no PCIM, no interrupts, no clock generator: one clock, clk_main_a0
 //     (250 MHz).
 // Placement: the shell's OCL and PCIS ports are on the middle die (SLR1), the DDR4 on the top die (SLR2). The
-// first register stage of OCL, PCIS and the reset (SH_SIDE) stays next to the shell; the core (CORE), its slice
-// to the DDR4 (DDR_SLC), SH_DDR and its statistics pipes go to SLR2 (build/constraints/small_shell_cl_pnr_user.xdc).
+// first register stage of OCL, PCIS and the reset, and the sending halves of the links to the core (SH_SIDE) stay
+// next to the shell; the core (CORE, with the links' receiving halves), its slice to the DDR4 (DDR_SLC), SH_DDR and
+// its statistics pipes go to SLR2 (build/constraints/small_shell_cl_pnr_user.xdc). The links (f2_slices.sv) carry
+// OCL and PCIS across the dies with credits: every wire between SH_SIDE and CORE leaves a register and enters one.
 module cl_jpeg #(
   parameter EN_DDR = 1,
   parameter NL     = 15
@@ -35,17 +37,13 @@ module cl_jpeg #(
 
   // ================================================================ the shell's side: first registers
   logic         core_rst;
-  logic         o_awvalid, o_awready, o_wvalid, o_wready, o_bvalid, o_bready, o_arvalid, o_arready, o_rvalid, o_rready;
-  logic [31:0]  o_awaddr, o_araddr, o_wdata, o_rdata;
-  logic [3:0]   o_wstrb;
-  logic [1:0]   o_bresp, o_rresp;
-  logic         p_awvalid, p_awready, p_wvalid, p_wready, p_wlast, p_bvalid, p_bready, p_arvalid, p_arready;
-  logic         p_rvalid, p_rready, p_rlast;
-  logic [15:0]  p_awid, p_bid, p_arid, p_rid;
-  logic [63:0]  p_awaddr, p_araddr, p_wstrb;
-  logic [7:0]   p_awlen, p_arlen;
-  logic [511:0] p_wdata, p_rdata;
-  logic [1:0]   p_bresp, p_rresp;
+  localparam int OFW = 3 + 2 * 32 + 36 + 2, OBW = 3 + 2 + 34 + 2;                 // the OCL link's buses
+  localparam int PFW = 3 + 2 * (16 + 64 + 8) + (512 + 64 + 1) + 2;               // the PCIS link's buses
+  localparam int PBW = 3 + 2 + (16 + 512 + 3) + (16 + 2);
+  logic [OFW-1:0] ocl_fwd;
+  logic [OBW-1:0] ocl_bwd;
+  logic [PFW-1:0] pcis_fwd;
+  logic [PBW-1:0] pcis_bwd;
   f2_shell_side SH_SIDE (.clk(clk_main_a0), .rst_n(rst_main_n), .core_rst(core_rst),
     .ocl_awvalid(ocl_cl_awvalid), .ocl_awready(cl_ocl_awready), .ocl_awaddr(ocl_cl_awaddr),
     .ocl_wvalid(ocl_cl_wvalid), .ocl_wready(cl_ocl_wready), .ocl_wdata(ocl_cl_wdata), .ocl_wstrb(ocl_cl_wstrb),
@@ -62,15 +60,7 @@ module cl_jpeg #(
     .pcis_araddr(sh_cl_dma_pcis_araddr), .pcis_arlen(sh_cl_dma_pcis_arlen),
     .pcis_rvalid(cl_sh_dma_pcis_rvalid), .pcis_rready(sh_cl_dma_pcis_rready), .pcis_rid(cl_sh_dma_pcis_rid),
     .pcis_rdata(cl_sh_dma_pcis_rdata), .pcis_rresp(cl_sh_dma_pcis_rresp), .pcis_rlast(cl_sh_dma_pcis_rlast),
-    .o_awvalid(o_awvalid), .o_awready(o_awready), .o_awaddr(o_awaddr), .o_wvalid(o_wvalid), .o_wready(o_wready),
-    .o_wdata(o_wdata), .o_wstrb(o_wstrb), .o_bvalid(o_bvalid), .o_bready(o_bready), .o_bresp(o_bresp),
-    .o_arvalid(o_arvalid), .o_arready(o_arready), .o_araddr(o_araddr), .o_rvalid(o_rvalid), .o_rready(o_rready),
-    .o_rdata(o_rdata), .o_rresp(o_rresp),
-    .p_awvalid(p_awvalid), .p_awready(p_awready), .p_awid(p_awid), .p_awaddr(p_awaddr), .p_awlen(p_awlen),
-    .p_wvalid(p_wvalid), .p_wready(p_wready), .p_wdata(p_wdata), .p_wstrb(p_wstrb), .p_wlast(p_wlast),
-    .p_bvalid(p_bvalid), .p_bready(p_bready), .p_bid(p_bid), .p_bresp(p_bresp),
-    .p_arvalid(p_arvalid), .p_arready(p_arready), .p_arid(p_arid), .p_araddr(p_araddr), .p_arlen(p_arlen),
-    .p_rvalid(p_rvalid), .p_rready(p_rready), .p_rid(p_rid), .p_rdata(p_rdata), .p_rresp(p_rresp), .p_rlast(p_rlast));
+    .ocl_fwd(ocl_fwd), .ocl_bwd(ocl_bwd), .pcis_fwd(pcis_fwd), .pcis_bwd(pcis_bwd));
   assign cl_sh_dma_pcis_ruser = 64'd0;
 
   // ================================================================ the core (SLR2)
@@ -82,18 +72,10 @@ module cl_jpeg #(
   logic [7:0]   m_awlen, m_arlen;
   logic [511:0] m_wdata, m_rdata;
   logic [1:0]   m_bresp, m_rresp;
-  f2_core #(.NL(NL), .IDW(16), .MAW(36), .COMMIT(`JPEG_F2_COMMIT)) CORE (.clk(clk_main_a0), .rst(core_rst),
+  f2_core #(.NL(NL), .IDW(16), .MAW(36), .COMMIT(`JPEG_F2_COMMIT), .OFW(OFW), .OBW(OBW), .PFW(PFW), .PBW(PBW)) CORE (
+    .clk(clk_main_a0), .rst(core_rst),
     .mem_ready(ddr_ready), .vled(cl_sh_status_vled),
-    .ocl_awvalid(o_awvalid), .ocl_awready(o_awready), .ocl_awaddr(o_awaddr), .ocl_wvalid(o_wvalid), .ocl_wready(o_wready),
-    .ocl_wdata(o_wdata), .ocl_wstrb(o_wstrb), .ocl_bvalid(o_bvalid), .ocl_bready(o_bready), .ocl_bresp(o_bresp),
-    .ocl_arvalid(o_arvalid), .ocl_arready(o_arready), .ocl_araddr(o_araddr), .ocl_rvalid(o_rvalid), .ocl_rready(o_rready),
-    .ocl_rdata(o_rdata), .ocl_rresp(o_rresp),
-    .pcis_awvalid(p_awvalid), .pcis_awready(p_awready), .pcis_awid(p_awid), .pcis_awaddr(p_awaddr), .pcis_awlen(p_awlen),
-    .pcis_wvalid(p_wvalid), .pcis_wready(p_wready), .pcis_wdata(p_wdata), .pcis_wstrb(p_wstrb), .pcis_wlast(p_wlast),
-    .pcis_bvalid(p_bvalid), .pcis_bready(p_bready), .pcis_bid(p_bid), .pcis_bresp(p_bresp),
-    .pcis_arvalid(p_arvalid), .pcis_arready(p_arready), .pcis_arid(p_arid), .pcis_araddr(p_araddr), .pcis_arlen(p_arlen),
-    .pcis_rvalid(p_rvalid), .pcis_rready(p_rready), .pcis_rid(p_rid), .pcis_rdata(p_rdata), .pcis_rresp(p_rresp),
-    .pcis_rlast(p_rlast),
+    .ocl_fwd(ocl_fwd), .ocl_bwd(ocl_bwd), .pcis_fwd(pcis_fwd), .pcis_bwd(pcis_bwd),
     .mem_awvalid(m_awvalid), .mem_awready(m_awready), .mem_awid(m_awid), .mem_awaddr(m_awaddr), .mem_awlen(m_awlen),
     .mem_wvalid(m_wvalid), .mem_wready(m_wready), .mem_wdata(m_wdata), .mem_wstrb(m_wstrb), .mem_wlast(m_wlast),
     .mem_bvalid(m_bvalid), .mem_bready(m_bready), .mem_bid(m_bid), .mem_bresp(m_bresp),
@@ -191,7 +173,8 @@ module cl_jpeg #(
   assign PCIE_RP_PERSTN = 1'b0; assign PCIE_RP_TXP = 8'd0; assign PCIE_RP_TXN = 8'd0;
 endmodule
 
-// The registers next to the shell: OCL and PCIS each through one register slice, and the core's reset.
+// The registers next to the shell: OCL and PCIS each through one register slice, then the sending halves of their
+// links to the core (f2_slices.sv), and the core's reset.
 module f2_shell_side (
   input  logic          clk,
   input  logic          rst_n,
@@ -238,52 +221,24 @@ module f2_shell_side (
   output logic [511:0]  pcis_rdata,
   output logic [1:0]    pcis_rresp,
   output logic          pcis_rlast,
-  output logic          o_awvalid,
-  input  logic          o_awready,
-  output logic [31:0]   o_awaddr,
-  output logic          o_wvalid,
-  input  logic          o_wready,
-  output logic [31:0]   o_wdata,
-  output logic [3:0]    o_wstrb,
-  input  logic          o_bvalid,
-  output logic          o_bready,
-  input  logic [1:0]    o_bresp,
-  output logic          o_arvalid,
-  input  logic          o_arready,
-  output logic [31:0]   o_araddr,
-  input  logic          o_rvalid,
-  output logic          o_rready,
-  input  logic [31:0]   o_rdata,
-  input  logic [1:0]    o_rresp,
-  output logic          p_awvalid,
-  input  logic          p_awready,
-  output logic [15:0]   p_awid,
-  output logic [63:0]   p_awaddr,
-  output logic [7:0]    p_awlen,
-  output logic          p_wvalid,
-  input  logic          p_wready,
-  output logic [511:0]  p_wdata,
-  output logic [63:0]   p_wstrb,
-  output logic          p_wlast,
-  input  logic          p_bvalid,
-  output logic          p_bready,
-  input  logic [15:0]   p_bid,
-  input  logic [1:0]    p_bresp,
-  output logic          p_arvalid,
-  input  logic          p_arready,
-  output logic [15:0]   p_arid,
-  output logic [63:0]   p_araddr,
-  output logic [7:0]    p_arlen,
-  input  logic          p_rvalid,
-  output logic          p_rready,
-  input  logic [15:0]   p_rid,
-  input  logic [511:0]  p_rdata,
-  input  logic [1:0]    p_rresp,
-  input  logic          p_rlast
+  output logic [104:0]  ocl_fwd,         // the links to the core (f2_axil_link_m, f2_axi_link_m; widths as in cl_jpeg)
+  input  logic [40:0]   ocl_bwd,
+  output logic [757:0]  pcis_fwd,
+  input  logic [553:0]  pcis_bwd
 );
-  logic rst_q1, rst_q2, rst;
-  always_ff @(posedge clk) begin rst_q1 <= !rst_n; rst_q2 <= rst_q1; core_rst <= rst_q2; end
+  // the reset: the slices next to the shell leave it first, the core one and two clocks later (cl_jpeg's CORE: one
+  // register there, then one per block), the links' sending halves here last, so that their receiving halves in
+  // the core are always ready first
+  logic rst_q1, rst_q2, rst, rst_l1, rst_l2, rst_lnk;
+  always_ff @(posedge clk) begin
+    rst_q1 <= !rst_n; rst_q2 <= rst_q1; core_rst <= rst_q2;
+    rst_l1 <= core_rst; rst_l2 <= rst_l1; rst_lnk <= rst_l2;
+  end
   assign rst = rst_q2;
+  logic        o_awvalid, o_awready, o_wvalid, o_wready, o_bvalid, o_bready, o_arvalid, o_arready, o_rvalid, o_rready;
+  logic [31:0] o_awaddr, o_araddr, o_wdata, o_rdata;
+  logic [3:0]  o_wstrb;
+  logic [1:0]  o_bresp, o_rresp;
   f2_axil_slice #(.AW(32)) OCL_SLC (.clk(clk), .rst(rst),
     .s_awvalid(ocl_awvalid), .s_awready(ocl_awready), .s_awaddr(ocl_awaddr), .s_wvalid(ocl_wvalid), .s_wready(ocl_wready),
     .s_wdata(ocl_wdata), .s_wstrb(ocl_wstrb), .s_bvalid(ocl_bvalid), .s_bready(ocl_bready), .s_bresp(ocl_bresp),
@@ -293,6 +248,18 @@ module f2_shell_side (
     .m_wdata(o_wdata), .m_wstrb(o_wstrb), .m_bvalid(o_bvalid), .m_bready(o_bready), .m_bresp(o_bresp),
     .m_arvalid(o_arvalid), .m_arready(o_arready), .m_araddr(o_araddr), .m_rvalid(o_rvalid), .m_rready(o_rready),
     .m_rdata(o_rdata), .m_rresp(o_rresp));
+  f2_axil_link_m #(.AW(32)) OCL_LNK (.clk(clk), .rst(rst_lnk),
+    .s_awvalid(o_awvalid), .s_awready(o_awready), .s_awaddr(o_awaddr), .s_wvalid(o_wvalid), .s_wready(o_wready),
+    .s_wdata(o_wdata), .s_wstrb(o_wstrb), .s_bvalid(o_bvalid), .s_bready(o_bready), .s_bresp(o_bresp),
+    .s_arvalid(o_arvalid), .s_arready(o_arready), .s_araddr(o_araddr), .s_rvalid(o_rvalid), .s_rready(o_rready),
+    .s_rdata(o_rdata), .s_rresp(o_rresp), .fwd(ocl_fwd), .bwd(ocl_bwd));
+  logic         p_awvalid, p_awready, p_wvalid, p_wready, p_wlast, p_bvalid, p_bready, p_arvalid, p_arready;
+  logic         p_rvalid, p_rready, p_rlast;
+  logic [15:0]  p_awid, p_bid, p_arid, p_rid;
+  logic [63:0]  p_awaddr, p_araddr, p_wstrb;
+  logic [7:0]   p_awlen, p_arlen;
+  logic [511:0] p_wdata, p_rdata;
+  logic [1:0]   p_bresp, p_rresp;
   f2_axi_slice #(.IDW(16), .AW(64), .DW(512)) PCIS_SLC (.clk(clk), .rst(rst),
     .s_awvalid(pcis_awvalid), .s_awready(pcis_awready), .s_awid(pcis_awid), .s_awaddr(pcis_awaddr), .s_awlen(pcis_awlen),
     .s_wvalid(pcis_wvalid), .s_wready(pcis_wready), .s_wdata(pcis_wdata), .s_wstrb(pcis_wstrb), .s_wlast(pcis_wlast),
@@ -305,4 +272,11 @@ module f2_shell_side (
     .m_bvalid(p_bvalid), .m_bready(p_bready), .m_bid(p_bid), .m_bresp(p_bresp),
     .m_arvalid(p_arvalid), .m_arready(p_arready), .m_arid(p_arid), .m_araddr(p_araddr), .m_arlen(p_arlen),
     .m_rvalid(p_rvalid), .m_rready(p_rready), .m_rid(p_rid), .m_rdata(p_rdata), .m_rresp(p_rresp), .m_rlast(p_rlast));
+  f2_axi_link_m #(.IDW(16), .AW(64), .DW(512)) PCIS_LNK (.clk(clk), .rst(rst_lnk),
+    .s_awvalid(p_awvalid), .s_awready(p_awready), .s_awid(p_awid), .s_awaddr(p_awaddr), .s_awlen(p_awlen),
+    .s_wvalid(p_wvalid), .s_wready(p_wready), .s_wdata(p_wdata), .s_wstrb(p_wstrb), .s_wlast(p_wlast),
+    .s_bvalid(p_bvalid), .s_bready(p_bready), .s_bid(p_bid), .s_bresp(p_bresp),
+    .s_arvalid(p_arvalid), .s_arready(p_arready), .s_arid(p_arid), .s_araddr(p_araddr), .s_arlen(p_arlen),
+    .s_rvalid(p_rvalid), .s_rready(p_rready), .s_rid(p_rid), .s_rdata(p_rdata), .s_rresp(p_rresp), .s_rlast(p_rlast),
+    .fwd(pcis_fwd), .bwd(pcis_bwd));
 endmodule

@@ -30,8 +30,11 @@
 //   +0x40 HASH_LO  +0x44 HASH_HI
 //   +0x48 T_START_LO  +0x4C T_START_HI   the clock count when the start was written
 //   +0x50 T_DONE_LO   +0x54 T_DONE_HI    the clock count when done reached the register file
-// Results stay until the lane accepts the next start. One write and one read are handled at a time; a
-// read answers two clocks after its address is accepted.
+// Results stay until the lane accepts the next start. One write and one read are handled at a time; a write
+// takes effect one clock after its response is given (its decoding is registered first), a read answers three
+// clocks after its address is accepted (each lane's register is selected first, then the lane). The job and
+// result registers have no reset (the host writes a job before starting it; results are read after a job);
+// only the control state is reset (2026-11-03: the reset of 15 lanes' job registers failed timing on the F2).
 // The lanes may sit a few registers away: a start goes out as a pulse with the job, and the lane answers
 // with acc (the start was accepted) or ign (the lane was busy); the start's tag and time are kept here
 // until that answer, so the bookkeeping is exact whatever the delay (one start per lane in flight: the
@@ -106,7 +109,7 @@ module f2_regs #(
     for (i = 0; i < NL; i = i + 1) begin done64[i] = done[i]; busy64[i] = busy[i]; end
   end
 
-  // ---- write: address and data together, then the response
+  // ---- write: address and data together, then the response; the decoded write is registered, then done
   logic           w_glob, w_lane;
   logic [LB-1:0]  wl;
   logic [ALW-1:0] w_off;
@@ -118,112 +121,132 @@ module f2_regs #(
   assign wr_en     = s_awvalid && s_wvalid && !s_bvalid;
   assign s_awready = wr_en;
   assign s_wready  = wr_en;
+  logic           we_q, wglob_q, wlane_q;
+  logic [LB-1:0]  wl_q;
+  logic [4:0]     wf_q;                          // the lane's register: offset [6:2]
+  logic [5:0]     wg_q;                          // the global register: address [7:2]
+  logic [31:0]    wd_q;
+  always_ff @(posedge clk) begin
+    we_q <= !rst && wr_en;
+    wglob_q <= w_glob; wlane_q <= w_lane; wl_q <= wl; wf_q <= w_off[6:2]; wg_q <= s_awaddr[7:2]; wd_q <= s_wdata;
+  end
 
-  always_ff @(posedge clk) begin : p_write
+  always_ff @(posedge clk) begin : p_ctrl     // the control state (reset)
     integer i;
     start <= '0; job_abort <= '0;
     if (rst) begin
-      s_bvalid <= 1'b0; clock_cnt <= '0; scratch <= '0;
-      in_addr <= '0; in_len <= '0; out_addr <= '0; out_max <= '0; tag_r <= '0; tag_p <= '0; t_p <= '0;
-      run_tag <= '0; n_acc <= '0; n_ign <= '0; t_start <= '0; t_done <= '0; done_q <= '0;
+      s_bvalid <= 1'b0; clock_cnt <= '0; scratch <= '0; n_acc <= '0; n_ign <= '0; done_q <= '0;
     end else begin
       clock_cnt <= clock_cnt + 64'd1;
       if (s_bvalid && s_bready) s_bvalid <= 1'b0;
-      if (wr_en) begin
-        s_bvalid <= 1'b1;
-        if (w_glob && s_awaddr[7:2] == 6'h0A) scratch <= s_wdata;
-        if (w_lane)
-          case (w_off[6:2])
-            5'h00: in_addr[wl][31:0]   <= s_wdata;
-            5'h01: in_addr[wl][63:32]  <= s_wdata;
-            5'h02: in_len[wl]          <= s_wdata;
-            5'h03: out_addr[wl][31:0]  <= s_wdata;
-            5'h04: out_addr[wl][63:32] <= s_wdata;
-            5'h05: out_max[wl]         <= s_wdata;
-            5'h06: tag_r[wl]           <= s_wdata;
-            5'h07: begin
-                     start[wl] <= s_wdata[0]; job_abort[wl] <= s_wdata[1];
-                     if (s_wdata[0]) begin tag_p[wl] <= tag_r[wl]; t_p[wl] <= clock_cnt; end
-                   end
-            default: ;
-          endcase
-      end
+      if (wr_en) s_bvalid <= 1'b1;
+      if (we_q && wglob_q && wg_q == 6'h0A) scratch <= wd_q;
+      if (we_q && wlane_q && wf_q == 5'h07) begin start[wl_q] <= wd_q[0]; job_abort[wl_q] <= wd_q[1]; end
       // the lane's answer to a start (it comes after the start, with the lane's own decision)
       for (i = 0; i < NL; i = i + 1) begin
-        if (acc[i]) begin n_acc[i] <= n_acc[i] + 16'd1; run_tag[i] <= tag_p[i]; t_start[i] <= t_p[i]; end
+        if (acc[i]) n_acc[i] <= n_acc[i] + 16'd1;
         if (ign[i]) n_ign[i] <= n_ign[i] + 16'd1;
         done_q[i] <= done[i];
-        if (done[i] && !done_q[i]) t_done[i] <= clock_cnt;
       end
     end
   end
-
-  // ---- read: the address is registered first, the register is read in the next clock
-  logic [ALW-1:0] ra;
-  logic           r_pend;
-  logic           r_glob, r_lane;
-  logic [LB-1:0]  rl;
-  logic [ALW-1:0] r_off;
-  assign r_glob = (ra < ALW'(32'h100));
-  assign r_off  = ra - ALW'(32'h100);
-  assign r_lane = !r_glob && (32'(r_off >> 7) < 32'(NL));
-  assign rl     = LB'(r_off >> 7);
-  logic [31:0] rd_val;
-  always_comb begin : p_rmux
-    rd_val = 32'd0;
-    if (r_glob)
-      case (ra[7:2])
-        6'h00: rd_val = 32'h4A504547;
-        6'h01: rd_val = 32'd2;
-        6'h02: rd_val = 32'(NL);
-        6'h03: rd_val = 32'(DW);
-        6'h04: rd_val = clock_cnt[31:0];
-        6'h05: rd_val = clock_hi_l;
-        6'h06: rd_val = done64[31:0];
-        6'h07: rd_val = done64[63:32];
-        6'h08: rd_val = busy64[31:0];
-        6'h09: rd_val = busy64[63:32];
-        6'h0A: rd_val = scratch;
-        6'h0B: rd_val = {31'd0, mem_ready};
-        6'h0C: rd_val = COMMIT;
-        6'h0D: rd_val = mem_err;
+  always_ff @(posedge clk) begin : p_data     // the jobs and the bookkeeping (no reset)
+    integer i;
+    if (we_q && wlane_q)
+      case (wf_q)
+        5'h00: in_addr[wl_q][31:0]   <= wd_q;
+        5'h01: in_addr[wl_q][63:32]  <= wd_q;
+        5'h02: in_len[wl_q]          <= wd_q;
+        5'h03: out_addr[wl_q][31:0]  <= wd_q;
+        5'h04: out_addr[wl_q][63:32] <= wd_q;
+        5'h05: out_max[wl_q]         <= wd_q;
+        5'h06: tag_r[wl_q]           <= wd_q;
+        5'h07: if (wd_q[0]) begin tag_p[wl_q] <= tag_r[wl_q]; t_p[wl_q] <= clock_cnt; end
         default: ;
       endcase
-    else if (r_lane)
-      case (r_off[6:2])
-        5'h00: rd_val = in_addr[rl][31:0];
-        5'h01: rd_val = in_addr[rl][63:32];
-        5'h02: rd_val = in_len[rl];
-        5'h03: rd_val = out_addr[rl][31:0];
-        5'h04: rd_val = out_addr[rl][63:32];
-        5'h05: rd_val = out_max[rl];
-        5'h06: rd_val = tag_r[rl];
-        5'h07: rd_val = {n_ign[rl], n_acc[rl]};
-        5'h08: rd_val = {3'd0, res_err[rl], 11'd0, res_abort[rl], res_axi_err[rl], res_ovf[rl], done[rl], busy[rl]};
-        5'h09: rd_val = run_tag[rl];
-        5'h0A: rd_val = res_cycles[rl];
-        5'h0B: rd_val = res_in_wait[rl];
-        5'h0C: rd_val = res_out_wait[rl];
-        5'h0D: rd_val = res_pixels[rl];
-        5'h0E: rd_val = res_records[rl];
-        5'h0F: rd_val = {res_h[rl], res_w[rl]};
-        5'h10: rd_val = res_hash[rl][31:0];
-        5'h11: rd_val = res_hash[rl][63:32];
-        5'h12: rd_val = t_start[rl][31:0];
-        5'h13: rd_val = t_start[rl][63:32];
-        5'h14: rd_val = t_done[rl][31:0];
-        5'h15: rd_val = t_done[rl][63:32];
-        default: ;
-      endcase
+    for (i = 0; i < NL; i = i + 1) begin
+      if (acc[i]) begin run_tag[i] <= tag_p[i]; t_start[i] <= t_p[i]; end
+      if (done[i] && !done_q[i]) t_done[i] <= clock_cnt;
+    end
   end
-  assign s_arready = !s_rvalid && !r_pend;
+
+  // ---- read: the address is accepted and decoded (registers); next clock each lane's register and the global
+  // register are selected (registers: one word per lane, near the lane); next clock the lane; then the answer
+  logic           r_p1, r_p2;
+  logic           rglob_q, rlane_q;
+  logic [LB-1:0]  rl_q;
+  logic [4:0]     rf_q;                          // the lane's register: offset [6:2]
+  logic [5:0]     rg_q;                          // the global register: address [7:2]
+  logic [ALW-1:0] r_off;
+  assign r_off = s_araddr - ALW'(32'h100);
+  logic [31:0]          g_val, g_q;
+  logic [NL-1:0][31:0]  l_val, l_q;
+  always_comb begin : p_gmux
+    g_val = 32'd0;
+    case (rg_q)
+      6'h00: g_val = 32'h4A504547;
+      6'h01: g_val = 32'd2;
+      6'h02: g_val = 32'(NL);
+      6'h03: g_val = 32'(DW);
+      6'h04: g_val = clock_cnt[31:0];
+      6'h05: g_val = clock_hi_l;
+      6'h06: g_val = done64[31:0];
+      6'h07: g_val = done64[63:32];
+      6'h08: g_val = busy64[31:0];
+      6'h09: g_val = busy64[63:32];
+      6'h0A: g_val = scratch;
+      6'h0B: g_val = {31'd0, mem_ready};
+      6'h0C: g_val = COMMIT;
+      6'h0D: g_val = mem_err;
+      default: ;
+    endcase
+  end
+  always_comb begin : p_lmux
+    integer i;
+    for (i = 0; i < NL; i = i + 1) begin
+      l_val[i] = 32'd0;
+      case (rf_q)
+        5'h00: l_val[i] = in_addr[i][31:0];
+        5'h01: l_val[i] = in_addr[i][63:32];
+        5'h02: l_val[i] = in_len[i];
+        5'h03: l_val[i] = out_addr[i][31:0];
+        5'h04: l_val[i] = out_addr[i][63:32];
+        5'h05: l_val[i] = out_max[i];
+        5'h06: l_val[i] = tag_r[i];
+        5'h07: l_val[i] = {n_ign[i], n_acc[i]};
+        5'h08: l_val[i] = {3'd0, res_err[i], 11'd0, res_abort[i], res_axi_err[i], res_ovf[i], done[i], busy[i]};
+        5'h09: l_val[i] = run_tag[i];
+        5'h0A: l_val[i] = res_cycles[i];
+        5'h0B: l_val[i] = res_in_wait[i];
+        5'h0C: l_val[i] = res_out_wait[i];
+        5'h0D: l_val[i] = res_pixels[i];
+        5'h0E: l_val[i] = res_records[i];
+        5'h0F: l_val[i] = {res_h[i], res_w[i]};
+        5'h10: l_val[i] = res_hash[i][31:0];
+        5'h11: l_val[i] = res_hash[i][63:32];
+        5'h12: l_val[i] = t_start[i][31:0];
+        5'h13: l_val[i] = t_start[i][63:32];
+        5'h14: l_val[i] = t_done[i][31:0];
+        5'h15: l_val[i] = t_done[i][63:32];
+        default: ;
+      endcase
+    end
+  end
+  assign s_arready = !s_rvalid && !r_p1 && !r_p2;
   always_ff @(posedge clk) begin
-    if (rst) begin s_rvalid <= 1'b0; s_rdata <= '0; clock_hi_l <= '0; r_pend <= 1'b0; ra <= '0; end
+    g_q <= g_val; l_q <= l_val;
+    if (s_arvalid && s_arready) begin
+      rglob_q <= (s_araddr < ALW'(32'h100)); rlane_q <= (s_araddr >= ALW'(32'h100)) && (32'(r_off >> 7) < 32'(NL));
+      rl_q <= LB'(r_off >> 7); rf_q <= r_off[6:2]; rg_q <= s_araddr[7:2];
+    end
+    if (rst) begin s_rvalid <= 1'b0; s_rdata <= '0; clock_hi_l <= '0; r_p1 <= 1'b0; r_p2 <= 1'b0; end
     else begin
-      if (s_arvalid && s_arready) begin ra <= s_araddr; r_pend <= 1'b1; end
-      if (r_pend) begin
-        r_pend <= 1'b0; s_rvalid <= 1'b1; s_rdata <= rd_val;
-        if (r_glob && ra[7:2] == 6'h04) clock_hi_l <= clock_cnt[63:32];
+      r_p1 <= s_arvalid && s_arready;
+      r_p2 <= r_p1;
+      if (r_p1 && rglob_q && rg_q == 6'h04) clock_hi_l <= clock_cnt[63:32];   // CLOCK_LO read: g_q holds the low word
+      if (r_p2) begin
+        s_rvalid <= 1'b1;
+        s_rdata  <= rglob_q ? g_q : (rlane_q ? l_q[rl_q] : 32'd0);
       end else if (s_rvalid && s_rready) s_rvalid <= 1'b0;
     end
   end

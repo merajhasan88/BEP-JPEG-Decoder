@@ -22,6 +22,12 @@
 // that ends at or before its SOI never ends a frame (jpeg_parser: in_last there has no effect): the host aborts
 // such a job (job_abort: no new requests, the bursts in flight complete, then done with res_abort; the
 // records of an aborted job are incomplete).
+// Timing (2026-11-03, the first build on AWS F2: 13,668 endpoints of this module failed at 250 MHz): the decoder
+// sees registers on both sides - its input bytes come from a two-entry stage (in_valid, in_data, in_last are
+// registers; in_ready goes no further than that stage), and its output records go into another (px_ready is a
+// register) - and the byte counts, the room in the write FIFO and the length of the next read
+// burst are kept as registers (down-counters with flags) instead of being compared in the handshakes. The records
+// go into the write FIFO one clock after they complete a beat. Each stage adds a clock or two of latency.
 module mem_lane #(
   parameter int AW    = 64,
   parameter int DW    = 512,          // AXI data width in bits: 256 or 512
@@ -92,7 +98,6 @@ module mem_lane #(
   assign rready = 1'b1;                          // FIFO space was reserved before the burst was asked for
   assign bready = 1'b1;
 
-  logic [31:0]   len_r;                          // the job's file length
   logic          fin;                            // frame_done seen (or the job aborted)
   logic          flushing;                       // fin and the last partial beat queued: drain the writes
   logic          dec_rst;                        // the decoder's reset, in the first clock of every job: until it
@@ -101,38 +106,64 @@ module mem_lane #(
 
   // ================================================================ read: file -> beat FIFO -> bytes
   logic [AW-1:0] rd_addr;
-  logic [31:0]   rd_left;                        // bytes not yet requested
+  logic [31:0]   rd_beats;                       // beats of the file not yet requested
   logic [FB:0]   r_resv;                         // beats in the FIFO + beats requested, not arrived
   logic [DW-1:0] rf_mem [0:FD-1];
   logic [FB-1:0] rf_wp, rf_rp;
   logic [FB:0]   rf_cnt;
   logic          ar_busy;                        // a read burst is in flight
-  logic [12:0]   to_4k_r;
-  logic [31:0]   left_beats;
+  // the next read burst's length and whether one is due, registers computed from rd_addr and rd_beats: they are
+  // current one clock after those change, and no burst is asked for in that clock (arvalid is up after a burst
+  // and dec_rst in a job's first clock)
   logic [8:0]    ar_n;                           // beats of the next read burst
-  assign to_4k_r    = 13'd4096 - {1'b0, rd_addr[11:0]};
-  assign left_beats = (rd_left + 32'(BYTES - 1)) >> BB;
-  always_comb begin
-    ar_n = 9'(BURST);
-    if (left_beats < 32'(ar_n)) ar_n = 9'(left_beats);
-    if (13'(to_4k_r >> BB) < 13'(ar_n)) ar_n = 9'(to_4k_r >> BB);
+  logic          rd_more;                        // rd_beats != 0
+  always_ff @(posedge clk) begin : g_arn
+    logic [12:0] to_4k;
+    logic [8:0]  n;
+    to_4k = 13'd4096 - {1'b0, rd_addr[11:0]};
+    n = 9'(BURST);
+    if (rd_beats < 32'(n)) n = 9'(rd_beats);
+    if (13'(to_4k >> BB) < 13'(n)) n = 9'(to_4k >> BB);
+    ar_n    <= n;
+    rd_more <= (rd_beats != 32'd0);
   end
   logic          ar_issue, r_push;
-  assign ar_issue = busy && !fin && !ar_busy && !arvalid && (rd_left != 32'd0) && (32'(r_resv) + 32'(ar_n) <= 32'(FD));
+  assign ar_issue = busy && !dec_rst && !fin && !ar_busy && !arvalid && rd_more && (10'(r_resv) + 10'(ar_n) <= 10'(FD));
   assign r_push   = rvalid && rready;
-  // the serializer: one beat at a time, its bytes one per accepted clock
+  // the serializer: one beat at a time, its bytes one per clock into the byte stage
   logic [DW-1:0] cur;
   logic          cur_v;
   logic [BB-1:0] cur_i;                          // the next byte of cur
-  logic [31:0]   fed;                            // bytes given to the decoder
-  logic          in_valid, in_ready, in_last, take, used_up, r_pop;
+  logic [31:0]   fl;                             // bytes of the file not yet given to the byte stage
+  logic          fl_nz, fl_one;                  // fl != 0, fl == 1
+  logic          bs_ready;                       // the byte stage takes a byte (a register)
+  logic          s_byte, take, used_up, r_pop;
+  logic [8:0]    s_bits;                         // {last, byte}
+  assign s_byte  = busy && !dec_rst && cur_v && fl_nz;
+  assign s_bits  = {fl_one, cur[8*cur_i +: 8]};
+  assign take    = s_byte && bs_ready;
+  assign used_up = !cur_v || (take && (cur_i == BB'(BYTES - 1)));
+  assign r_pop   = busy && used_up && (rf_cnt != '0) && (take ? (fl_nz && !fl_one) : fl_nz);   // bytes remain after this one
+  // the byte stage: two entries, its outputs are registers; cleared at every job's start
+  logic          in_valid, in_ready, in_last;
   logic [7:0]    in_data;
-  assign in_valid = busy && !dec_rst && cur_v && (fed < len_r);
-  assign in_data  = cur[8*cur_i +: 8];
-  assign in_last  = (fed + 32'd1 == len_r);
-  assign take     = in_valid && in_ready;
-  assign used_up  = !cur_v || (take && (cur_i == BB'(BYTES - 1)));
-  assign r_pop    = busy && used_up && (rf_cnt != '0) && ((fed + (take ? 32'd1 : 32'd0)) < len_r);
+  logic [8:0]    bs_q, bs_skid;
+  logic          bs_skid_v;
+  assign bs_ready = !bs_skid_v;
+  assign in_last  = bs_q[8];
+  assign in_data  = bs_q[7:0];
+  always_ff @(posedge clk) begin : g_bs
+    if (!bs_skid_v) bs_skid <= s_bits;
+    if (!in_valid || in_ready) bs_q <= bs_skid_v ? bs_skid : s_bits;
+    if (rst || (start && !busy)) begin
+      in_valid <= 1'b0; bs_skid_v <= 1'b0;
+    end else if (in_valid && !in_ready) begin
+      if (s_byte && !bs_skid_v) bs_skid_v <= 1'b1;
+    end else begin
+      in_valid  <= bs_skid_v || s_byte;
+      bs_skid_v <= 1'b0;
+    end
+  end
 
   // ================================================================ the decoder
   logic        px_valid, px_ready, px_sof, px_eol, frame_start, frame_done;
@@ -148,17 +179,46 @@ module mem_lane #(
     .px_c0(px_c0), .px_c1(px_c1), .px_c2(px_c2), .px_sof(px_sof), .px_eol(px_eol),
     .img_w(img_w), .img_h(img_h), .frame_start(frame_start), .frame_done(frame_done), .err(dec_err));
 
+  // ================================================================ the decoder's output stage
+  // two entries, cleared at every job's start; px_ready: the job runs (not in its first clock, not after the frame's end
+  // or an abort) and the stage has room - a register (it fans out widely in the decoder), set in the control block
+  // from the next values of busy, dec_rst, fin and po_skid_v. The packer takes from the stage when the write FIFO
+  // has room (room_q) and the job was not aborted; after the frame's end it empties the stage before the last,
+  // partial beat.
+  localparam int PB = 3 + 16 + 16 + 96;          // {n, x, y, c2, c1, c0}
+  logic [PB-1:0] px_bits, po_q, po_skid;
+  logic          po_v, po_skid_v, px_fire, po_take, room_q;
+  assign px_bits  = {px_n, px_x, px_y, px_c2, px_c1, px_c0};
+  assign px_fire  = px_valid && px_ready;
+  assign po_take  = po_v && busy && !res_abort && room_q;
+  always_ff @(posedge clk) begin : g_po
+    if (!po_skid_v) po_skid <= px_bits;
+    if (!po_v || po_take) po_q <= po_skid_v ? po_skid : px_bits;
+    if (rst || (start && !busy)) begin
+      po_v <= 1'b0; po_skid_v <= 1'b0;
+    end else if (po_v && !po_take) begin
+      if (px_fire) po_skid_v <= 1'b1;
+    end else begin
+      po_v      <= po_skid_v || px_fire;
+      po_skid_v <= 1'b0;
+    end
+  end
+  logic [2:0]  po_n;
+  logic [15:0] po_x, po_y;
+  logic [31:0] po_c0, po_c1, po_c2;
+  assign {po_n, po_x, po_y, po_c2, po_c1, po_c0} = po_q;
+
   // ================================================================ records -> beats -> write FIFO
   logic [127:0] rec;
   always_comb begin : g_rec
     integer i;
     rec = '0;
-    rec[15:0] = px_x; rec[31:16] = px_y;
+    rec[15:0] = po_x; rec[31:16] = po_y;
     for (i = 0; i < 4; i = i + 1)
-      if (i < px_n) begin
-        rec[32 + 24*i +: 8] = px_c0[8*i +: 8];
-        rec[40 + 24*i +: 8] = px_c1[8*i +: 8];
-        rec[48 + 24*i +: 8] = px_c2[8*i +: 8];
+      if (i < po_n) begin
+        rec[32 + 24*i +: 8] = po_c0[8*i +: 8];
+        rec[40 + 24*i +: 8] = po_c1[8*i +: 8];
+        rec[48 + 24*i +: 8] = po_c2[8*i +: 8];
       end
   end
   logic [DW-1:0] pk;                             // the beat being packed
@@ -166,16 +226,18 @@ module mem_lane #(
   logic [DW-1:0] wf_mem [0:FD-1];
   logic [RB:0]   wf_nr  [0:FD-1];                // records in each queued beat
   logic [FB-1:0] wf_wp, wf_rp;
-  logic [FB:0]   wf_cnt;                         // beats in the FIFO
+  logic [FB:0]   wf_cnt;                         // beats in the FIFO (written)
   logic [FB:0]   wf_free;                        // of them: not yet given to an AW burst
-  logic [31:0]   out_max_beats, out_beats;       // room and beats queued so far
-  logic          px_fire, pk_full, pk_last, w_push;
-  assign px_ready = busy && !dec_rst && !fin && (wf_cnt < FB'(FD - 1));   // room for the beat this record may complete
-                                                 // (not from a decoder still holding an aborted job's beat)
-  assign px_fire  = px_valid && px_ready;
-  assign pk_full  = px_fire && (pk_n == (RB+1)'(RPW - 1));     // this record completes a beat
-  assign pk_last  = fin && !flushing && (pk_n != '0) && (wf_cnt < (FB+1)'(FD));   // the last, partial beat
-  assign w_push   = (pk_full || pk_last) && (out_beats < out_max_beats);
+  logic [31:0]   ob_left;                        // beats of room left in the output area
+  logic          ob_nz;                          // ob_left != 0
+  logic          pk_full, pk_last, w_push;
+  logic          wq_v;                           // the beat completed one clock ago is written into the FIFO now
+  logic [FB-1:0] wq_a;
+  logic [DW-1:0] wq_d;
+  logic [RB:0]   wq_nr;
+  assign pk_full  = po_take && (pk_n == (RB+1)'(RPW - 1));     // this record completes a beat
+  assign pk_last  = fin && !flushing && !po_v && (pk_n != '0) && room_q;   // the last, partial beat
+  assign w_push   = (pk_full || pk_last) && ob_nz;
   // write bursts
   logic [AW-1:0] wr_addr;
   logic [12:0]   to_4k_w;
@@ -220,33 +282,35 @@ module mem_lane #(
   logic        h1, h2;
   always_ff @(posedge clk) begin : g_hash
     integer i;
-    h1 <= px_fire; h2 <= h1;
+    h1 <= po_take; h2 <= h1;
     for (i = 0; i < 4; i = i + 1) begin
-      h_v[i] <= mix({px_y, px_x + 16'(i), 8'd0, px_c0[8*i +: 8], px_c1[8*i +: 8], px_c2[8*i +: 8]});
-      hm[i] <= (i < px_n);
+      h_v[i] <= mix({po_y, po_x + 16'(i), 8'd0, po_c0[8*i +: 8], po_c1[8*i +: 8], po_c2[8*i +: 8]});
+      hm[i] <= (i < po_n);
     end
     hs <= (hm[0] ? h_v[0] : 64'd0) + (hm[1] ? h_v[1] : 64'd0) + (hm[2] ? h_v[2] : 64'd0) + (hm[3] ? h_v[3] : 64'd0);
   end
 
   // ================================================================ control
+  logic iw_q, ow_q;                              // one clock ago: the decoder waited for input / for the writer
   always_ff @(posedge clk) begin
     if (rst || (start && !busy)) begin
       busy <= !rst; done <= 1'b0; fin <= 1'b0; flushing <= 1'b0;
-      rd_addr <= in_addr; rd_left <= in_len; len_r <= in_len; wr_addr <= out_addr;
-      out_max_beats <= out_max >> BB; out_beats <= '0;
+      rd_addr <= in_addr; rd_beats <= (in_len + 32'(BYTES - 1)) >> BB; wr_addr <= out_addr;
+      fl <= in_len; fl_nz <= (in_len != 32'd0); fl_one <= (in_len == 32'd1);
+      ob_left <= out_max >> BB; ob_nz <= ((out_max >> BB) != 32'd0);
       arvalid <= 1'b0; araddr <= '0; arlen <= '0; ar_busy <= 1'b0;
       awvalid <= 1'b0; awaddr <= '0; awlen <= '0;
-      rf_wp <= '0; rf_rp <= '0; rf_cnt <= '0; r_resv <= '0; cur <= '0; cur_v <= 1'b0; cur_i <= '0; fed <= '0;
-      wf_wp <= '0; wf_rp <= '0; wf_cnt <= '0; wf_free <= '0; pk <= '0; pk_n <= '0;
-      bq_wp <= '0; bq_rp <= '0; bq_cnt <= '0; b_out <= '0; w_left <= '0;
+      rf_wp <= '0; rf_rp <= '0; rf_cnt <= '0; r_resv <= '0; cur <= '0; cur_v <= 1'b0; cur_i <= '0;
+      wf_wp <= '0; wf_rp <= '0; wf_cnt <= '0; wf_free <= '0; pk <= '0; pk_n <= '0; wq_v <= 1'b0; room_q <= 1'b1;
+      bq_wp <= '0; bq_rp <= '0; bq_cnt <= '0; b_out <= '0; w_left <= '0; iw_q <= 1'b0; ow_q <= 1'b0; px_ready <= 1'b0;
       res_err <= '0; res_ovf <= 1'b0; res_axi_err <= 1'b0; res_abort <= 1'b0; res_cycles <= '0; res_in_wait <= '0; res_out_wait <= '0;
       res_pixels <= '0; res_records <= '0; res_hash <= '0; res_w <= '0; res_h <= '0;
     end else if (busy) begin
       // ---- read: a burst when the FIFO has room for it; the beats into the FIFO; one beat out to the serializer
       if (ar_issue) begin
         arvalid <= 1'b1; araddr <= rd_addr; arlen <= 8'(ar_n - 9'd1);
-        rd_addr <= rd_addr + (AW'(ar_n) << BB);
-        rd_left <= (rd_left > (32'(ar_n) << BB)) ? rd_left - (32'(ar_n) << BB) : 32'd0;
+        rd_addr  <= rd_addr + (AW'(ar_n) << BB);
+        rd_beats <= rd_beats - 32'(ar_n);                    // ar_n <= rd_beats
       end
       if (arvalid && arready) begin arvalid <= 1'b0; ar_busy <= 1'b1; end
       if (r_push) begin
@@ -256,7 +320,7 @@ module mem_lane #(
       end
       rf_cnt <= rf_cnt + (r_push ? 1'b1 : 1'b0) - (r_pop ? 1'b1 : 1'b0);
       r_resv <= r_resv + (ar_issue ? (FB+1)'(ar_n) : '0) - (r_pop ? 1'b1 : 1'b0);
-      if (take) fed <= fed + 32'd1;
+      if (take) begin fl <= fl - 32'd1; fl_nz <= fl_nz && !fl_one; fl_one <= (fl == 32'd2); end
       if (r_pop) begin cur <= rf_mem[rf_rp]; cur_v <= 1'b1; cur_i <= '0; rf_rp <= rf_rp + 1'b1; end
       else if (take) begin
         if (cur_i == BB'(BYTES - 1)) cur_v <= 1'b0;
@@ -264,27 +328,35 @@ module mem_lane #(
       end
       // ---- the decoder's results
       if (frame_start && !dec_rst) begin res_w <= img_w; res_h <= img_h; end
-      if (!fin) begin
-        res_cycles <= res_cycles + 32'd1;
-        if (!dec_rst && in_ready && !in_valid && fed < len_r) res_in_wait <= res_in_wait + 32'd1;
-        if (!dec_rst && px_valid && !px_ready) res_out_wait <= res_out_wait + 32'd1;
-      end
-      if (px_fire) begin res_pixels <= res_pixels + 32'(px_n); res_records <= res_records + 32'd1; end
+      // px_ready = busy && !dec_rst && !fin && !po_skid_v in the next clock (busy stays while !fin; dec_rst is 0)
+      px_ready <= !fin && !(frame_done && !dec_rst) && !job_abort && !(po_v && !po_take && (po_skid_v || px_fire));
+      if (!fin) res_cycles <= res_cycles + 32'd1;
+      iw_q <= !fin && !dec_rst && in_ready && !in_valid && fl_nz;   // bytes remain, none is offered
+      ow_q <= !fin && !dec_rst && px_valid && !px_ready;
+      if (iw_q) res_in_wait <= res_in_wait + 32'd1;
+      if (ow_q) res_out_wait <= res_out_wait + 32'd1;
+      if (po_take) begin res_pixels <= res_pixels + 32'(po_n); res_records <= res_records + 32'd1; end
       if (h2) res_hash <= res_hash + hs;
       if (frame_done && !dec_rst) begin fin <= 1'b1; res_err <= dec_err; end
       else if (job_abort && !fin) begin fin <= 1'b1; flushing <= 1'b1; res_abort <= 1'b1; res_err <= dec_err; end   // a partial beat is dropped
       // ---- records into beats; beats into the write FIFO (beyond out_max: dropped, res_ovf)
-      if (px_fire) begin
+      if (po_take) begin
         pk[128*pk_n[RB-1:0] +: 128] <= rec;
         pk_n <= pk_full ? '0 : pk_n + 1'b1;
       end
       if (pk_last) pk_n <= '0;
+      wq_v <= w_push;                            // a completed beat is written into the FIFO one clock later
       if (w_push) begin
-        wf_mem[wf_wp] <= pk_full ? {rec, pk[DW-129:0]} : pk;
-        wf_nr[wf_wp]  <= pk_full ? (RB+1)'(RPW) : pk_n;
-        wf_wp <= wf_wp + 1'b1; out_beats <= out_beats + 32'd1;
+        wq_a  <= wf_wp;
+        wq_d  <= pk_full ? {rec, pk[DW-129:0]} : pk;
+        wq_nr <= pk_full ? (RB+1)'(RPW) : pk_n;
+        wf_wp <= wf_wp + 1'b1;
+        ob_left <= ob_left - 32'd1; ob_nz <= (ob_left != 32'd1);
       end else if (pk_full || pk_last) res_ovf <= 1'b1;
-      if (fin && !flushing && (pk_n == '0 || pk_last)) flushing <= 1'b1;
+      if (wq_v) begin wf_mem[wq_a] <= wq_d; wf_nr[wq_a] <= wq_nr; end
+      // room for one more beat in the next clock, with a beat's margin: at most one beat is added per clock
+      room_q <= ((FB+2)'(wf_cnt) + (FB+2)'(wq_v)) < (FB+2)'(FD - 2);
+      if (fin && !flushing && !po_v && (pk_n == '0 || pk_last)) flushing <= 1'b1;   // after the stage is empty
       // ---- write bursts: AW when a whole burst is queued (or a boundary / the end limits it); W in AW order
       if (aw_go) begin
         awvalid <= 1'b1; awaddr <= wr_addr; awlen <= 8'(aw_n - 9'd1);
@@ -297,14 +369,14 @@ module mem_lane #(
       if (bq_take) begin w_left <= bq[bq_rp]; bq_rp <= bq_rp + 1'b1; end
       else if (w_pop) w_left <= w_left - 9'd1;
       if (w_pop) wf_rp <= wf_rp + 1'b1;
-      wf_cnt  <= wf_cnt + (w_push ? 1'b1 : 1'b0) - (w_pop ? 1'b1 : 1'b0);
-      wf_free <= wf_free + (w_push ? 1'b1 : 1'b0) - (aw_go ? (FB+1)'(aw_n) : '0);
+      wf_cnt  <= wf_cnt + (wq_v ? 1'b1 : 1'b0) - (w_pop ? 1'b1 : 1'b0);
+      wf_free <= wf_free + (wq_v ? 1'b1 : 1'b0) - (aw_go ? (FB+1)'(aw_n) : '0);
       bq_cnt  <= bq_cnt + (aw_acc ? 1'b1 : 1'b0) - (bq_take ? 1'b1 : 1'b0);
       b_out   <= b_out + (aw_acc ? 1'b1 : 1'b0) - (b_fire ? 1'b1 : 1'b0);
       if (b_fire && bresp != 2'b00) res_axi_err <= 1'b1;
       // ---- the end: frame done, every beat written and acknowledged, no read burst in flight, the hash complete
-      if (flushing && wf_cnt == '0 && bq_cnt == '0 && w_left == 9'd0 && b_out == '0 && !awvalid && !arvalid && !ar_busy
-          && !h1 && !h2) begin
+      if (flushing && wf_cnt == '0 && !wq_v && bq_cnt == '0 && w_left == 9'd0 && b_out == '0 && !awvalid && !arvalid
+          && !ar_busy && !h1 && !h2) begin
         busy <= 1'b0; done <= 1'b1;
       end
     end

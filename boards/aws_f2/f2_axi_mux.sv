@@ -2,6 +2,9 @@
 // onto the DDR4 controller), INCR bursts of 64-byte beats. Vendor-neutral.
 //   - AR and AW: round robin, decided one clock before the transfer (the grant is a register), so a
 //     request takes two clocks and the master's valid stays up meanwhile (AXI: valid is held until ready).
+//     The masters' valids are registered here first (they come from far away: 2026-11-03, the round robin on
+//     them failed timing on the F2 at -0.389 ns), so a request is seen a clock later; the master granted in a
+//     clock is left out of the next clock's copy, as its valid may drop after the handshake.
 //     The slave side's ID is the master's index; the slave may answer different IDs in any order.
 //   - W: the data of the bursts in the order their addresses went out (AXI4 has no WID): the index of each
 //     granted AW burst is queued (WQ entries; AW waits while the queue is full) and the head's master
@@ -84,6 +87,7 @@ module f2_axi_mux #(
   // ================================================================ AR
   logic [MB-1:0] ar_g, ar_last;
   logic          ar_gv, ar_free;
+  logic [NM-1:0] ar_req;                         // up_arvalid one clock ago, without the master granted then
   assign ar_free = !dn_arvalid || dn_arready;
   always_comb begin : p_arready
     integer i;
@@ -91,16 +95,17 @@ module f2_axi_mux #(
   end
   always_ff @(posedge clk) begin
     if (rst) begin
-      ar_gv <= 1'b0; ar_g <= '0; ar_last <= MB'(NM - 1); dn_arvalid <= 1'b0;
+      ar_gv <= 1'b0; ar_g <= '0; ar_last <= MB'(NM - 1); dn_arvalid <= 1'b0; ar_req <= '0;
     end else begin
+      ar_req <= up_arvalid & ~((ar_gv && ar_free) ? (NM'(1) << ar_g) : '0);
       if (dn_arvalid && dn_arready) dn_arvalid <= 1'b0;
       if (ar_gv) begin
         if (ar_free) begin
           dn_arvalid <= 1'b1; dn_arid <= IDW'(ar_g); dn_araddr <= up_araddr[ar_g]; dn_arlen <= up_arlen[ar_g];
           ar_gv <= 1'b0; ar_last <= ar_g;
         end
-      end else if (|up_arvalid) begin
-        ar_g <= rr_pick(up_arvalid, ar_last); ar_gv <= 1'b1;
+      end else if (|ar_req) begin
+        ar_g <= rr_pick(ar_req, ar_last); ar_gv <= 1'b1;
       end
     end
   end
@@ -120,6 +125,7 @@ module f2_axi_mux #(
   // ================================================================ AW, and the order of the W bursts
   logic [MB-1:0] aw_g, aw_last;
   logic          aw_gv, aw_free;
+  logic [NM-1:0] aw_req;                         // up_awvalid one clock ago, without the master granted then
   logic [MB-1:0] wq [0:WQ-1];
   logic [QB-1:0] wq_wp, wq_rp;
   logic [QB:0]   wq_n;
@@ -133,16 +139,17 @@ module f2_axi_mux #(
   end
   always_ff @(posedge clk) begin
     if (rst) begin
-      aw_gv <= 1'b0; aw_g <= '0; aw_last <= MB'(NM - 1); dn_awvalid <= 1'b0;
+      aw_gv <= 1'b0; aw_g <= '0; aw_last <= MB'(NM - 1); dn_awvalid <= 1'b0; aw_req <= '0;
     end else begin
+      aw_req <= up_awvalid & ~(aw_take ? (NM'(1) << aw_g) : '0);
       if (dn_awvalid && dn_awready) dn_awvalid <= 1'b0;
       if (aw_gv) begin
         if (aw_take) begin
           dn_awvalid <= 1'b1; dn_awid <= IDW'(aw_g); dn_awaddr <= up_awaddr[aw_g]; dn_awlen <= up_awlen[aw_g];
           aw_gv <= 1'b0; aw_last <= aw_g;
         end
-      end else if (|up_awvalid) begin
-        aw_g <= rr_pick(up_awvalid, aw_last); aw_gv <= 1'b1;
+      end else if (|aw_req) begin
+        aw_g <= rr_pick(aw_req, aw_last); aw_gv <= 1'b1;
       end
     end
   end

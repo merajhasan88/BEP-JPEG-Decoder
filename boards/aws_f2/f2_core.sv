@@ -2,64 +2,32 @@
 // vendor-neutral: NL decoder lanes (mem_lane.sv), the host's registers (f2_regs.sv) on the OCL port, the
 // host's memory port (f2_pcis.sv) on PCIS, and one AXI4 master to the memory (on F2: the DDR4 controller
 // sh_ddr) through the multiplexer f2_axi_mux.sv (masters 0..NL-1 the lanes, NL the host).
-// The shell's ports come in through register slices on the shell's side of the die crossing (in cl_jpeg.sv);
-// here every port has one more slice, every lane has slices on its memory port and registers on its job
-// inputs and answers, so that no path inside runs between distant blocks without a register.
+// The shell's ports come from the shell's side of the die crossing (in cl_jpeg.sv: a register slice next to the
+// shell, then the sending half of a link) over links with credits (f2_slices.sv): their receiving halves are here,
+// so that no signal from far away drives more than a few registers (2026-11-03: the slices there were not enough).
+// Every lane has slices on its memory port and registers on its job inputs and answers. The reset arrives on one
+// register here and goes on through one register per block.
 // Addresses reach the memory reduced to MAW bits (64 GiB: the DIMM).
 module f2_core #(
   parameter int          NL     = 15,
   parameter int          IDW    = 16,        // the shell's and the memory's AXI ID width
   parameter int          MAW    = 36,
-  parameter logic [31:0] COMMIT = 32'h0
+  parameter logic [31:0] COMMIT = 32'h0,
+  // the links' buses (f2_axil_link_s, f2_axi_link_s)
+  parameter int          OFW    = 3 + 2 * 32 + 36 + 2,
+  parameter int          OBW    = 3 + 2 + 34 + 2,
+  parameter int          PFW    = 3 + 2 * (IDW + 64 + 8) + (512 + 64 + 1) + 2,
+  parameter int          PBW    = 3 + 2 + (IDW + 512 + 3) + (IDW + 2)
 ) (
   input  logic               clk,
   input  logic               rst,
   input  logic               mem_ready,
   output logic [15:0]        vled,
-  // OCL (AXI-Lite) from the shell
-  input  logic               ocl_awvalid,
-  output logic               ocl_awready,
-  input  logic [31:0]        ocl_awaddr,
-  input  logic               ocl_wvalid,
-  output logic               ocl_wready,
-  input  logic [31:0]        ocl_wdata,
-  input  logic [3:0]         ocl_wstrb,
-  output logic               ocl_bvalid,
-  input  logic               ocl_bready,
-  output logic [1:0]         ocl_bresp,
-  input  logic               ocl_arvalid,
-  output logic               ocl_arready,
-  input  logic [31:0]        ocl_araddr,
-  output logic               ocl_rvalid,
-  input  logic               ocl_rready,
-  output logic [31:0]        ocl_rdata,
-  output logic [1:0]         ocl_rresp,
-  // PCIS (AXI4) from the shell
-  input  logic               pcis_awvalid,
-  output logic               pcis_awready,
-  input  logic [IDW-1:0]     pcis_awid,
-  input  logic [63:0]        pcis_awaddr,
-  input  logic [7:0]         pcis_awlen,
-  input  logic               pcis_wvalid,
-  output logic               pcis_wready,
-  input  logic [511:0]       pcis_wdata,
-  input  logic [63:0]        pcis_wstrb,
-  input  logic               pcis_wlast,
-  output logic               pcis_bvalid,
-  input  logic               pcis_bready,
-  output logic [IDW-1:0]     pcis_bid,
-  output logic [1:0]         pcis_bresp,
-  input  logic               pcis_arvalid,
-  output logic               pcis_arready,
-  input  logic [IDW-1:0]     pcis_arid,
-  input  logic [63:0]        pcis_araddr,
-  input  logic [7:0]         pcis_arlen,
-  output logic               pcis_rvalid,
-  input  logic               pcis_rready,
-  output logic [IDW-1:0]     pcis_rid,
-  output logic [511:0]       pcis_rdata,
-  output logic [1:0]         pcis_rresp,
-  output logic               pcis_rlast,
+  // OCL (AXI-Lite) and PCIS (AXI4) from the shell's side, over links
+  input  logic [OFW-1:0]     ocl_fwd,
+  output logic [OBW-1:0]     ocl_bwd,
+  input  logic [PFW-1:0]     pcis_fwd,
+  output logic [PBW-1:0]     pcis_bwd,
   // the memory (AXI4 master)
   output logic               mem_awvalid,
   input  logic               mem_awready,
@@ -94,16 +62,19 @@ module f2_core #(
   logic [31:0] mem_err;
   always_ff @(posedge clk) mem_ready_q <= mem_ready;
 
+  // ================================================================ the reset: one register here, then one per block
+  logic rst_c, rst_lnk, rst_regs, rst_pcis, rst_mux, rst_mem;
+  always_ff @(posedge clk) begin
+    rst_c <= rst;
+    rst_lnk <= rst_c; rst_regs <= rst_c; rst_pcis <= rst_c; rst_mux <= rst_c; rst_mem <= rst_c;
+  end
+
   // ================================================================ OCL -> registers
   logic        r_awvalid, r_awready, r_wvalid, r_wready, r_bvalid, r_bready, r_arvalid, r_arready, r_rvalid, r_rready;
   logic [31:0] r_awaddr, r_araddr, r_wdata, r_rdata;
   logic [3:0]  r_wstrb;
   logic [1:0]  r_bresp, r_rresp;
-  f2_axil_slice #(.AW(32)) u_ocl_slc (.clk(clk), .rst(rst),
-    .s_awvalid(ocl_awvalid), .s_awready(ocl_awready), .s_awaddr(ocl_awaddr), .s_wvalid(ocl_wvalid), .s_wready(ocl_wready),
-    .s_wdata(ocl_wdata), .s_wstrb(ocl_wstrb), .s_bvalid(ocl_bvalid), .s_bready(ocl_bready), .s_bresp(ocl_bresp),
-    .s_arvalid(ocl_arvalid), .s_arready(ocl_arready), .s_araddr(ocl_araddr), .s_rvalid(ocl_rvalid), .s_rready(ocl_rready),
-    .s_rdata(ocl_rdata), .s_rresp(ocl_rresp),
+  f2_axil_link_s #(.AW(32), .FW(OFW), .BW(OBW)) u_ocl_lnk (.clk(clk), .rst(rst_lnk), .fwd(ocl_fwd), .bwd(ocl_bwd),
     .m_awvalid(r_awvalid), .m_awready(r_awready), .m_awaddr(r_awaddr), .m_wvalid(r_wvalid), .m_wready(r_wready),
     .m_wdata(r_wdata), .m_wstrb(r_wstrb), .m_bvalid(r_bvalid), .m_bready(r_bready), .m_bresp(r_bresp),
     .m_arvalid(r_arvalid), .m_arready(r_arready), .m_araddr(r_araddr), .m_rvalid(r_rvalid), .m_rready(r_rready),
@@ -114,7 +85,7 @@ module f2_core #(
   logic [NL-1:0][31:0]  in_len, out_max, res_cycles, res_in_wait, res_out_wait, res_pixels, res_records;
   logic [NL-1:0][12:0]  res_err;
   logic [NL-1:0][15:0]  res_w, res_h;
-  f2_regs #(.NL(NL), .DW(DW), .ALW(16), .COMMIT(COMMIT)) u_regs (.clk(clk), .rst(rst),
+  f2_regs #(.NL(NL), .DW(DW), .ALW(16), .COMMIT(COMMIT)) u_regs (.clk(clk), .rst(rst_regs),
     .s_awvalid(r_awvalid), .s_awready(r_awready), .s_awaddr(r_awaddr[15:0]), .s_wvalid(r_wvalid), .s_wready(r_wready),
     .s_wdata(r_wdata), .s_wstrb(r_wstrb), .s_bvalid(r_bvalid), .s_bready(r_bready), .s_bresp(r_bresp),
     .s_arvalid(r_arvalid), .s_arready(r_arready), .s_araddr(r_araddr[15:0]), .s_rvalid(r_rvalid), .s_rready(r_rready),
@@ -144,7 +115,7 @@ module f2_core #(
       logic [63:0] in_addr_q, out_addr_q;
       logic [31:0] in_len_q, out_max_q;
       always_ff @(posedge clk) begin
-        rst_l <= rst;
+        rst_l <= rst_c;
         start_q <= start[i] && !rst; abort_q <= job_abort[i] && !rst;
         in_addr_q <= in_addr[i]; in_len_q <= in_len[i]; out_addr_q <= out_addr[i]; out_max_q <= out_max[i];
         acc[i] <= start_q && !busy_l && !rst_l;       // mem_lane takes a start exactly when it is not busy
@@ -197,19 +168,14 @@ module f2_core #(
   logic [DW-1:0]    p_wdata, p_rdata;
   logic [DW/8-1:0]  p_wstrb;
   logic [1:0]       p_bresp, p_rresp;
-  f2_axi_slice #(.IDW(IDW), .AW(64), .DW(DW)) u_pcis_slc (.clk(clk), .rst(rst),
-    .s_awvalid(pcis_awvalid), .s_awready(pcis_awready), .s_awid(pcis_awid), .s_awaddr(pcis_awaddr), .s_awlen(pcis_awlen),
-    .s_wvalid(pcis_wvalid), .s_wready(pcis_wready), .s_wdata(pcis_wdata), .s_wstrb(pcis_wstrb), .s_wlast(pcis_wlast),
-    .s_bvalid(pcis_bvalid), .s_bready(pcis_bready), .s_bid(pcis_bid), .s_bresp(pcis_bresp),
-    .s_arvalid(pcis_arvalid), .s_arready(pcis_arready), .s_arid(pcis_arid), .s_araddr(pcis_araddr), .s_arlen(pcis_arlen),
-    .s_rvalid(pcis_rvalid), .s_rready(pcis_rready), .s_rid(pcis_rid), .s_rdata(pcis_rdata), .s_rresp(pcis_rresp),
-    .s_rlast(pcis_rlast),
+  f2_axi_link_s #(.IDW(IDW), .AW(64), .DW(DW), .FW(PFW), .BW(PBW)) u_pcis_lnk (.clk(clk), .rst(rst_lnk),
+    .fwd(pcis_fwd), .bwd(pcis_bwd),
     .m_awvalid(p_awvalid), .m_awready(p_awready), .m_awid(p_awid), .m_awaddr(p_awaddr), .m_awlen(p_awlen),
     .m_wvalid(p_wvalid), .m_wready(p_wready), .m_wdata(p_wdata), .m_wstrb(p_wstrb), .m_wlast(p_wlast),
     .m_bvalid(p_bvalid), .m_bready(p_bready), .m_bid(p_bid), .m_bresp(p_bresp),
     .m_arvalid(p_arvalid), .m_arready(p_arready), .m_arid(p_arid), .m_araddr(p_araddr), .m_arlen(p_arlen),
     .m_rvalid(p_rvalid), .m_rready(p_rready), .m_rid(p_rid), .m_rdata(p_rdata), .m_rresp(p_rresp), .m_rlast(p_rlast));
-  f2_pcis #(.IDW(IDW), .MAW(MAW), .DW(DW), .IDQ(32)) u_pcis (.clk(clk), .rst(rst),
+  f2_pcis #(.IDW(IDW), .MAW(MAW), .DW(DW), .IDQ(32)) u_pcis (.clk(clk), .rst(rst_pcis),
     .mem_ready(mem_ready_q), .mem_on(mem_on), .err_cnt(mem_err),
     .s_awvalid(p_awvalid), .s_awready(p_awready), .s_awid(p_awid), .s_awaddr(p_awaddr), .s_awlen(p_awlen),
     .s_wvalid(p_wvalid), .s_wready(p_wready), .s_wdata(p_wdata), .s_wstrb(p_wstrb), .s_wlast(p_wlast),
@@ -231,7 +197,7 @@ module f2_core #(
   logic [DW-1:0]    d_rdata, d_wdata;
   logic [DW/8-1:0]  d_wstrb;
   logic [1:0]       d_rresp, d_bresp;
-  f2_axi_mux #(.NM(NM), .IDW(IDW), .AW(64), .DW(DW), .WQ(16)) u_mux (.clk(clk), .rst(rst),
+  f2_axi_mux #(.NM(NM), .IDW(IDW), .AW(64), .DW(DW), .WQ(16)) u_mux (.clk(clk), .rst(rst_mux),
     .up_arvalid(x_arvalid), .up_arready(x_arready), .up_araddr(x_araddr), .up_arlen(x_arlen),
     .up_rvalid(x_rvalid), .up_rready(x_rready), .up_rdata(x_rdata), .up_rresp(x_rresp), .up_rlast(x_rlast),
     .up_awvalid(x_awvalid), .up_awready(x_awready), .up_awaddr(x_awaddr), .up_awlen(x_awlen),
@@ -245,7 +211,7 @@ module f2_core #(
   logic [63:0] d_awaddr_m, d_araddr_m;
   assign d_awaddr_m = {{(64-MAW){1'b0}}, d_awaddr[MAW-1:0]};
   assign d_araddr_m = {{(64-MAW){1'b0}}, d_araddr[MAW-1:0]};
-  f2_axi_slice #(.IDW(IDW), .AW(64), .DW(DW)) u_mem_slc (.clk(clk), .rst(rst),
+  f2_axi_slice #(.IDW(IDW), .AW(64), .DW(DW)) u_mem_slc (.clk(clk), .rst(rst_mem),
     .s_awvalid(d_awvalid), .s_awready(d_awready), .s_awid(d_awid), .s_awaddr(d_awaddr_m), .s_awlen(d_awlen),
     .s_wvalid(d_wvalid), .s_wready(d_wready), .s_wdata(d_wdata), .s_wstrb(d_wstrb), .s_wlast(d_wlast),
     .s_bvalid(d_bvalid), .s_bready(d_bready), .s_bid(d_bid), .s_bresp(d_bresp),
