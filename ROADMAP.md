@@ -8,7 +8,7 @@ request; the names are the owner's.
 | **Proposal A** | split the stream of one image that has no restart markers, so several decoders can share one photo | research started 2026-10-04 after 22:40 PKT (owner: "sure go ahead keeping in mind the load on the laptop's cores") |
 | **Proposal B** | a way around the Huffman loop limit (one code per clock) | research started with A, in parallel |
 | **Task A** | batched mode of the wide core on fpgas.online Welland | **done 2026-10-05**: 15 wide decoders at 150 MHz (-3 grade), 18/18 identical to libjpeg 9e on the board, 372 photos/s on adapter.jpg; details below and in `boards/acorn_cle215/README.md` |
-| **Task B** | all tests on AWS F2 | three images in the owner's order (2026-11-03): 1) the batch engine on DDR4, 2) Proposal A on DDR4, 3) HBM with A and the batch engine; image 1 prepared and simulated (`boards/aws_f2/cl_jpeg`); its first AWS build (2026-11-03) failed timing at placement, mostly in `mem_lane.sv` (`boards/aws_f2/README.md`); nothing is set up on AWS without the owner's go-ahead and a cost given first |
+| **Task B** | all tests on AWS F2 | three images in the owner's order (2026-11-03): 1) the batch engine on DDR4, 2) Proposal A on DDR4, 3) HBM with A and the batch engine; image 1 prepared and simulated (`boards/aws_f2/cl_jpeg`); its first AWS build (2026-11-03) failed timing at placement, mostly in `mem_lane.sv`; the second (0aa3cd6, the same day) met timing at 250 MHz: AFI afi-0385ad594097d39f3 / agfi-0db16f77a44ec64f8, not yet run on an F2 card (`boards/aws_f2/README.md`); nothing is set up on AWS without the owner's go-ahead and a cost given first |
 | **Review 2026-10-10** | external review of the 10 October hand-over (`../jpeg-decoder-review-2026-10-10.md`) | four defects: three fixed and verified the same day, the fourth (board checksum) described; see "Review of 2026-10-10" below |
 
 Research, measurements, estimates and the plan for both proposals: `PROPOSALS.md`.
@@ -202,3 +202,7 @@ Owner: "In parallel (pun intended) lets find a way around Huffman loop limitatio
     read addresses), about 2,100 in the glue (the multiplexer into the host's port, the reset and OCL paths between
     the dies), 98 in the decoders. The route was stopped; no AFI. About $2.2 in all, $1.0 of it on two earlier failed
     attempts. Details in `boards/aws_f2/README.md`, "First build on AWS".
+  - Second build, 2026-11-03 (0aa3cd6: registered stages around each decoder in `mem_lane.sv`, links with credits
+    between the dies, the reset tree, a pipelined register file; placement `ExtraTimingOpt`): timing met at 250 MHz
+    (+0.015 ns after routing), AFI afi-0385ad594097d39f3 / agfi-0db16f77a44ec64f8; about $0.82. Next: a host program
+    and an F2 run (an f2.6xlarge needs a quota of 24 vCPUs; 8 granted).

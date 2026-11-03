@@ -3,8 +3,10 @@
 **Image 1 (owner, 2026-11-03: "1) DDR4 with Task B. 2) DDR4 with Proposal A. 3) HBM with Proposal A + Task B"):**
 the batch engine on the F2 card's DDR4, 15 lanes (`cl_jpeg/`). The first build on AWS (2026-11-03, commit 4d1d7b9)
 passed AWS's simulation test but **failed timing at placement** (-0.88 ns at 250 MHz, mostly in `mem_lane.sv`'s
-interfaces to the decoder, not in the decoder): no image (AFI) yet. Below, "First build on AWS". Nothing is launched
-there without the owner's go-ahead and a cost given first. The vendor-neutral parts were written and simulated first
+interfaces to the decoder, not in the decoder). After the changes below, **the second build (0aa3cd6, the same day)
+met timing at 250 MHz** (+0.015 ns after routing): **AFI afi-0385ad594097d39f3, AGFI agfi-0db16f77a44ec64f8**. It has
+not run on an F2 card yet (that needs an f2.6xlarge, a larger vCPU quota and a host program). Below, "First build on
+AWS" and "Second build on AWS". Nothing is launched there without the owner's go-ahead and a cost given first. The vendor-neutral parts were written and simulated first
 (2026-10-10: the lanes and the job engine); the custom logic (CL) for AWS's small shell and its tests followed on
 2026-11-03.
 
@@ -185,7 +187,9 @@ dies are not modelled here at all. A local result is therefore a necessary check
 - S3 a few cents a month;
 - AFI creation free.
 
-About $2-3 per attempt. The first build reached the end of placement 70 minutes after it started (synthesis 8 min,
+About $2-3 per attempt was the estimate; the second build, which met timing at its first try, used the instance for
+1.5 h (about $0.82: setup 2 min, AWS's XSIM test 8 min, the build 1 h 19 min). The first build reached the end of
+placement 70 minutes after it started (synthesis 8 min,
 link and opt 12 min, placement 28 min, physical optimisation 21 min): a build whose timing estimate there is clearly
 negative should be stopped at that point instead of routed, which saves about an hour: `build_on_aws.sh` does so
 since 2026-11-03 (its WNS gate). Running the image needs an f2.6xlarge ($1.98/h) and the F-instance quota of 24 vCPUs
@@ -275,3 +279,37 @@ These estimates know nothing of placement: on AWS the same paths came out about 
 this machine's placed estimate. What they show is the depth taken out of the paths that failed. The elaboration of
 the real top level found every cell the placement constraints name. Files:
 `/media/developer/HIKSEMI/Vivado/builds/f2_local_7b0cc5a8/` (`levels_vs_0c688d45/`).
+
+### Second build on AWS (2026-11-03): timing met, AFI created
+
+Commit 0aa3cd6 (the changes above, 7b0cc5a, and the links' sending stages, 6c78b7c), on the owner's go-ahead ("continue
+with next build while remaining cautious"). Placement directive `ExtraTimingOpt` (`build_on_aws.sh --place`; AWS's
+default `SSI_SpreadLogic_high` had spread the core over its die), the gate after placement at -0.15 ns.
+- Before: the regressions of 0aa3cd6 from a clean checkout (CL 3,075/3,075, lanes 4,920/4,920, engine 3,690/3,690,
+  CL with the photos 3,147/3,147; the 15-lane photo batches within 0.01 % of 4d1d7b9's clocks), xvlog/xelab of the CL,
+  and the elaboration of the real top level, all clean.
+- AWS's XSIM test passed (COMMIT 0x0aa3cd65; the DDR4 ready after 23 polls; lane 0 1,561 clocks, lane 1 2,365, both
+  hashes = golden; 8 minutes with the first compilation of AWS's simulation IP).
+- Timing at 250 MHz, against the first build at the same points:
+
+| point | first build (4d1d7b9) | second build (0aa3cd6) |
+|---|---|---|
+| after opt (before placement) | -1.128 ns | +0.711 ns |
+| after placement | -0.989 ns | +0.346 ns |
+| after physical optimisation | -0.881 ns, TNS -4,134 ns | +0.346 ns, TNS 0 |
+| after routing | (stopped) | **+0.015 ns, TNS 0; hold +0.010 ns** |
+
+  AWS's check: "Design has no negative slack path". The margin is thin: a changed design must be expected to need
+  work again. The worst paths after placement were PCIS's B link between the dies (+0.346 ns: Vivado had merged the
+  link's registers on that side into one shift register, `..._srl3`, so the hop was not split; `shreg_extract = "no"`
+  on those registers would split it), the core's reset into the lanes' start registers (+0.419 ns; they still take
+  the core's input reset) and a lane's `cur` reset (+0.432 ns); AWS's DDR4 IP +0.49 ns.
+- Build time 1 h 19 min (synthesis 9 min, link and opt 12, placement 30, physical optimisation 5, routing 18, the
+  rest 5). The instance ran 16:57-18:31 UTC (1 h 34 min): about **$0.82**. The day's total on AWS: about $3.0 (the
+  first instance $2.18, of it about $1.0 on two attempts that failed on our mistakes).
+- The tarball `2026_11_03-170850.Developer_CL.tar`, sha256 7e2b9ca36705f3ee65b497036ec847f56363a0e8337b7550e3cb32bb837cbe59,
+  is in the private S3 bucket (`dcp/`); reports, logs and the tarball on the SSD:
+  `/media/developer/HIKSEMI/Vivado/builds/f2_aws_0aa3cd65/`.
+- The AFI was requested at 18:33 UTC: afi-0385ad594097d39f3 / agfi-0db16f77a44ec64f8 (name bep-jpeg-0aa3cd65).
+  Next: an F2 run (`fpga-load-local-image -S 0 -I agfi-0db16f77a44ec64f8` on an f2.6xlarge) with a host program
+  (not written yet) - after a quota increase to 24 vCPUs and the owner's go-ahead with its cost.
