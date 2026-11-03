@@ -162,7 +162,10 @@ dies are not modelled here at all. A local result is therefore a necessary check
    - aws-fpga v2.3.5 and `hdk_setup.sh`;
    - the commit stamp;
    - AWS's XSIM test (stops unless "TEST PASSED");
-   - the DCP build: `aws_build_dcp_from_cl.py -c cl_jpeg --no-encrypt`; our sources are open;
+   - the DCP build: `aws_build_dcp_from_cl.py -c cl_jpeg --no-encrypt`; our sources are open; `--place DIRECTIVE`
+     sets the placement directive (AWS's default `SSI_SpreadLogic_high`);
+   - the gate after placement and physical optimisation (about 70 minutes in): a timing estimate below `--wns-gate`
+     (default -0.15 ns) stops the build there, before routing;
    - the timing check: a build that fails timing (`post_route.VIOLATED.dcp`) stops there, and no AFI is made from it
      without the owner's explicit yes.
 
@@ -184,7 +187,8 @@ dies are not modelled here at all. A local result is therefore a necessary check
 
 About $2-3 per attempt. The first build reached the end of placement 70 minutes after it started (synthesis 8 min,
 link and opt 12 min, placement 28 min, physical optimisation 21 min): a build whose timing estimate there is clearly
-negative should be stopped at that point instead of routed, which saves about an hour.
+negative should be stopped at that point instead of routed, which saves about an hour: `build_on_aws.sh` does so
+since 2026-11-03 (its WNS gate).
 
 ### First build on AWS (2026-11-03)
 

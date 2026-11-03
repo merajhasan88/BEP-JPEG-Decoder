@@ -6,19 +6,28 @@
 #   2. the CL (this folder in the tarball): the commit's first 8 hex digits stamped into cl_jpeg_defines.vh (the OCL
 #      register COMMIT reads them back on the F2); the HDK's three build scripts linked into build/scripts
 #   3. AWS's XSIM test of the CL (verif/tests/cl_jpeg_test.sv): must end with "TEST PASSED"
-#   4. the DCP build (aws_build_dcp_from_cl.py -c cl_jpeg --no-encrypt: our sources are open), then the timing check:
-#      a design that fails timing (post_route.VIOLATED.dcp) is reported and not offered for AFI creation
+#   4. the DCP build (aws_build_dcp_from_cl.py -c cl_jpeg --no-encrypt: our sources are open; --place sets the
+#      placement directive, AWS's default SSI_SpreadLogic_high), then the timing checks:
+#      - after placement and physical optimisation: if the estimated WNS is below the gate (--wns-gate, default -0.15 ns)
+#        the build is stopped there, before routing (about an hour of the instance; routing does not recover such a
+#        deficit: the first build on AWS, 2026-11-03, ended -0.881 ns there);
+#      - a design that fails timing after routing (post_route.VIOLATED.dcp) is reported and not offered for AFI creation
 # usage (on the build instance, in the unpacked tarball's top folder):
-#   boards/aws_f2/cl_jpeg/build_on_aws.sh [--sim-only] [--skip-sim]
+#   boards/aws_f2/cl_jpeg/build_on_aws.sh [--sim-only] [--skip-sim] [--place DIRECTIVE] [--wns-gate NS]
 set -euo pipefail
-SIM=1; BUILD=1
-for a in "$@"; do
-  case "$a" in
+SIM=1; BUILD=1; PLACE=SSI_SpreadLogic_high; GATE=-0.15
+while [ $# -gt 0 ]; do
+  case "$1" in
     --sim-only) BUILD=0 ;;
     --skip-sim) SIM=0 ;;
-    *) echo "unknown option $a"; exit 2 ;;
+    --place)    PLACE=${2:?--place needs a directive}; shift ;;
+    --wns-gate) GATE=${2:?--wns-gate needs a value in ns}; shift ;;
+    *) echo "unknown option $1"; exit 2 ;;
   esac
+  shift
 done
+[[ "$PLACE" =~ ^[A-Za-z_]+$ ]] || { echo "not a placement directive: $PLACE"; exit 2; }
+[[ "$GATE" =~ ^-?[0-9]+(\.[0-9]+)?$ ]] || { echo "not a number of ns: $GATE"; exit 2; }
 SRC=$(cd "$(dirname "$0")/../../.." && pwd)              # the unpacked tarball's top folder
 CL=$SRC/boards/aws_f2/cl_jpeg
 WORK=${WORK:-$HOME/bepjpeg_f2}
@@ -83,12 +92,36 @@ fi
 
 # ---- 4. the DCP build and its timing
 cd "$CL/build/scripts"
-log "DCP build started (aws_build_dcp_from_cl.py -c cl_jpeg --no-encrypt)"
+log "DCP build started (aws_build_dcp_from_cl.py -c cl_jpeg --no-encrypt --place $PLACE); stopped after placement if WNS < $GATE ns"
+START=$(date +%s)
+# in its own process group (setsid), so that the gate below can stop the HDK's script and its Vivado together
+setsid timeout 36000 ./aws_build_dcp_from_cl.py -c cl_jpeg --no-encrypt --place "$PLACE" > "$WORK/logs/dcp_build.log" 2>&1 &
+BPID=$!
+GATED=0
+while kill -0 $BPID 2> /dev/null; do                      # ends with the build (itself under a 10 h timeout)
+  sleep 60
+  VLOG=$(find "$CL/build/scripts" -maxdepth 1 -name '*.vivado.log' -newermt "@$START" 2> /dev/null | head -1)
+  [ -n "$VLOG" ] || continue
+  W=$(grep -m1 -oE "Post Physical Optimization Timing Summary \| WNS=-?[0-9.]+" "$VLOG" | grep -oE -- "-?[0-9.]+$" || true)
+  if [ -n "$W" ] && awk -v w="$W" -v g="$GATE" 'BEGIN { exit !(w + 0 < g + 0) }'; then
+    log "TIMING FAILED after placement: WNS $W ns is below the gate $GATE ns; stopping the build before routing"
+    kill -TERM -- "-$BPID" 2> /dev/null || true
+    sleep 20
+    kill -KILL -- "-$BPID" 2> /dev/null || true
+    GATED=1
+    break
+  fi
+done
 set +e
-timeout 36000 ./aws_build_dcp_from_cl.py -c cl_jpeg --no-encrypt > "$WORK/logs/dcp_build.log" 2>&1
+wait $BPID
 rc=$?
 set -e
 log "DCP build ended (rc=$rc)"
+if [ $GATED = 1 ]; then
+  grep -E "Timing Summary \| WNS=" "$VLOG" | tail -3 | tee -a "$WORK/logs/build_on_aws.log"
+  log "no route, no tarball: the reports and checkpoints so far are in $CL/build (copy them back before terminating)"
+  exit 1
+fi
 CK=$CL/build/checkpoints
 TAR=$(ls -t "$CK"/*.Developer_CL.tar 2>/dev/null | head -1 || true)
 RPT=$(ls -t "$CL"/build/reports/*.post_route_timing.rpt 2>/dev/null | head -1 || true)
