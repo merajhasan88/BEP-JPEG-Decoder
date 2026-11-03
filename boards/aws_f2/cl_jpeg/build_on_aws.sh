@@ -46,6 +46,7 @@ command -v vivado > /dev/null || { log "vivado is not on PATH and no settings64.
 log "vivado: $(vivado -version | head -1)"
 cd "$WORK/aws-fpga"
 set +e +u                                                 # AWS's setup script is not written for errexit / nounset
+set --                                                    # a sourced script sees our arguments: hdk_setup.sh rejects them
 # shellcheck disable=SC1091
 source hdk_setup.sh > "$WORK/logs/hdk_setup.log" 2>&1
 rc=$?
