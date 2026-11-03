@@ -8,7 +8,7 @@ request; the names are the owner's.
 | **Proposal A** | split the stream of one image that has no restart markers, so several decoders can share one photo | research started 2026-10-04 after 22:40 PKT (owner: "sure go ahead keeping in mind the load on the laptop's cores") |
 | **Proposal B** | a way around the Huffman loop limit (one code per clock) | research started with A, in parallel |
 | **Task A** | batched mode of the wide core on fpgas.online Welland | **done 2026-10-05**: 15 wide decoders at 150 MHz (-3 grade), 18/18 identical to libjpeg 9e on the board, 372 photos/s on adapter.jpg; details below and in `boards/acorn_cle215/README.md` |
-| **Task B** | all tests on AWS F2 | three images in the owner's order (2026-11-03): 1) the batch engine on DDR4, 2) Proposal A on DDR4, 3) HBM with A and the batch engine; image 1 prepared and simulated (`boards/aws_f2/cl_jpeg`); nothing is set up on AWS without the owner's go-ahead and a cost given first |
+| **Task B** | all tests on AWS F2 | three images in the owner's order (2026-11-03): 1) the batch engine on DDR4, 2) Proposal A on DDR4, 3) HBM with A and the batch engine; image 1 prepared and simulated (`boards/aws_f2/cl_jpeg`); its first AWS build (2026-11-03) failed timing at placement, mostly in `mem_lane.sv` (`boards/aws_f2/README.md`); nothing is set up on AWS without the owner's go-ahead and a cost given first |
 | **Review 2026-10-10** | external review of the 10 October hand-over (`../jpeg-decoder-review-2026-10-10.md`) | four defects: three fixed and verified the same day, the fourth (board checksum) described; see "Review of 2026-10-10" below |
 
 Research, measurements, estimates and the plan for both proposals: `PROPOSALS.md`.
@@ -197,3 +197,8 @@ Owner: "In parallel (pun intended) lets find a way around Huffman loop limitatio
   - AWS's own XSIM test of it runs on the build machine before the build.
   - The build script stops on a failed simulation or a failed timing check.
   - Steps and cost (about $2-3 per attempt) are in `boards/aws_f2/README.md`.
+  - First build on AWS, 2026-11-03 (commit 4d1d7b9): AWS's XSIM test passed; timing failed at placement (-0.881 ns,
+    15,879 endpoints at 250 MHz): 13,668 in `mem_lane.sv`'s interfaces to the decoder (its byte feed, write FIFO and
+    read addresses), about 2,100 in the glue (the multiplexer into the host's port, the reset and OCL paths between
+    the dies), 98 in the decoders. The route was stopped; no AFI. About $2.2 in all, $1.0 of it on two earlier failed
+    attempts. Details in `boards/aws_f2/README.md`, "First build on AWS".

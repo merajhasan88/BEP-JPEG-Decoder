@@ -1,10 +1,12 @@
 # AWS F2 harness (Task B)
 
 **Image 1 (owner, 2026-11-03: "1) DDR4 with Task B. 2) DDR4 with Proposal A. 3) HBM with Proposal A + Task B"):**
-the batch engine on the F2 card's DDR4, 15 lanes, ready for AWS's build (`cl_jpeg/`); nothing has run on AWS yet,
-and nothing is launched there without the owner's go-ahead and a cost given first. The vendor-neutral parts were
-written and simulated first (2026-10-10: the lanes and the job engine); the custom logic (CL) for AWS's small shell
-and its tests followed on 2026-11-03.
+the batch engine on the F2 card's DDR4, 15 lanes (`cl_jpeg/`). The first build on AWS (2026-11-03, commit 4d1d7b9)
+passed AWS's simulation test but **failed timing at placement** (-0.88 ns at 250 MHz, mostly in `mem_lane.sv`'s
+interfaces to the decoder, not in the decoder): no image (AFI) yet. Below, "First build on AWS". Nothing is launched
+there without the owner's go-ahead and a cost given first. The vendor-neutral parts were written and simulated first
+(2026-10-10: the lanes and the job engine); the custom logic (CL) for AWS's small shell and its tests followed on
+2026-11-03.
 
 | file | what it is |
 |---|---|
@@ -142,6 +144,12 @@ F2's VU47P -2).**
 Each stage runs as its own process, from a clean checkout of one commit (sources checked by
 `boards/acorn_cle215/provenance.tcl`).
 
+**What the local check cannot see.** The KU5P is one die without AWS's shell. On the F2's VU47P the core is held in
+the top die (SLR2) and AWS's placement directive (`SSI_SpreadLogic_high`) spreads it: in the first AWS build it used 39 %
+of SLR2's LUTs but touched 70 % of its CLBs, so the routes were longer. The same paths (`mem_lane`'s byte index
+`cur_i`) had +0.254 ns here after placement and -0.722 ns on AWS: about 1 ns apart. Paths that cross between the
+dies are not modelled here at all. A local result is therefore a necessary check, not a prediction of AWS's timing.
+
 ### Building the image on AWS (the owner's go-ahead first; the cost is given before anything is launched)
 
 1. **Here:** `boards/aws_f2/cl_jpeg/package.sh <commit>` writes `bepjpeg_f2_<8 hex>.tar.gz`. It is that commit's
@@ -168,10 +176,54 @@ Each stage runs as its own process, from a clean checkout of one commit (sources
 6. **Terminate the instance** (its disk goes with it). The S3 bucket may stay.
 
 **Cost (2026-11-03 prices, us-east-1):**
-- r6i.2xlarge $0.504/h for about 3.5-5 h (setup ~0.5 h, AWS's XSIM test 0.5-1 h, the build 2.5-3.5 h with 15 lanes);
+- r6i.2xlarge $0.504/h for about 3.5-5 h (setup ~0.5 h, AWS's XSIM test about 4 minutes once the DDR4 is started as
+  above, the build 2.5-3.5 h with 15 lanes);
 - its disk and public address about $0.03/h;
 - S3 a few cents a month;
 - AFI creation free.
 
-About $2-3 per attempt. Running it needs an f2.6xlarge ($1.98/h) and the F-instance quota of 24 vCPUs (8 granted as of
+About $2-3 per attempt. The first build reached the end of placement 70 minutes after it started (synthesis 8 min,
+link and opt 12 min, placement 28 min, physical optimisation 21 min): a build whose timing estimate there is clearly
+negative should be stopped at that point instead of routed, which saves about an hour.
+
+### First build on AWS (2026-11-03)
+
+One r6i.2xlarge from 10:19 to 14:28 UTC (4.15 h): about **$2.2** in all ($2.09 the instance, $0.09 its disk). No image
+was made. Two attempts failed on our mistakes before the third ran (about $1.0 of the $2.2):
+- **db65d1b:** AWS's XSIM test waited 20 ms of simulated time for a DDR4 that AWS's shell model never starts (85
+  minutes). The test now starts the DDR4 as AWS's tests do (3eb58ef; "AWS's own test" above).
+- **3eb58ef:** the test passed, but synthesis stopped in elaboration ("[Synth 8-5809] Error generated from encrypted
+  envelope" in `sh_ddr.sv`). AWS's `sh_ddr` also instantiates the IPs `cl_axi_clock_converter` and
+  `cl_axi_clock_converter_light`, which our synthesis script did not read; it does since 4d1d7b9
+  (`cl_jpeg/build/scripts/synth_cl_jpeg.tcl`).
+- **4d1d7b9:**
+  - AWS's XSIM test passed (COMMIT 0x4d1d7b94, the DDR4 ready after 24 polls at 31.6 us of simulated time, both
+    files decoded = golden);
+  - synthesis, placement and physical optimisation completed;
+  - after placement WNS -0.989 ns, after physical optimisation **-0.881 ns, TNS -4,134 ns: 15,879 of 708,638
+    endpoints of clk_main_a0 failed**, hold -0.245 ns (normal before routing);
+  - the route was stopped five minutes in, because routing does not recover 0.9 ns on paths that are 90 % wire.
+
+The same commit's Verilator regressions, from a clean checkout, all passed: CL 3,075/3,075 jobs, lanes 4,920/4,920,
+engine 3,690/3,690, CL with the photos 3,147/3,147.
+
+Where the 15,879 endpoints are (a timing analysis of the placed design on the instance; each endpoint counted once,
+with its worst path):
+- **13,668 in `mem_lane.sv`, the wrapper around each decoder** (every lane; worst -0.742 ns):
+  - its byte feed to the decoder: the decoder's `in_ready` into the 512-bit word register `cur`, the byte index and
+    the read-FIFO counters, and back (7-14 logic levels; 5,684 endpoints of `cur` alone);
+  - its write FIFO: the count into the write enables of the FIFO's distributed RAM (3,424 endpoints, -0.53 ns) and
+    into the decoder's output ready (649);
+  - its read-address arithmetic: 32-bit `rd_left` into the address and the reservation count (-0.49 ns).
+- **98 inside the decoders** (-0.325 ns).
+- **About 2,100 in the glue:**
+  - 764 from the multiplexer into the host's port: its W-burst queue into the PCIS slice's 577-bit register enables
+    is the worst path (-0.881 ns): a ready that is a combination, sent along a long wire;
+  - 1,001 of the core's reset, from the shell's die into the register file's wide job registers (-0.448 ns);
+  - 300 of the OCL path: its slices between the two dies (94, -0.673 ns) and into the register file (206);
+  - 26 in the register file's read multiplexer (-0.515 ns).
+- **7 inside AWS's `sh_ddr`**, its statistics path (-0.635 ns), likely the crowding around it.
+
+The reports, the logs, the analysis (`analysis/failing_buckets.txt`) and the checkpoints after synthesis and after
+physical optimisation are in `/media/developer/HIKSEMI/Vivado/builds/f2_aws_4d1d7b94/`. Running it needs an f2.6xlarge ($1.98/h) and the F-instance quota of 24 vCPUs (8 granted as of
 2026-11-03).
