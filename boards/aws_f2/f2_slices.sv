@@ -199,15 +199,17 @@ endmodule
 // dies of the VU47P) in which nothing that comes from far away drives more than a few flip-flops. The sender
 // holds credits for the receiver's FIFO (DEPTH entries) and sends a beat only with a credit; the receiver
 // returns a credit for every beat it hands on. Every wire between the two halves leaves a register and enters
-// one: STAGES registers on the way there and STAGES on the credit's way back, so the first may sit at a die
-// crossing and the last next to the FIFO. A credit is back after 2 * STAGES + 4 clocks: DEPTH >= 2 * STAGES + 4
-// keeps a beat per clock (DEPTH a power of two). The two halves must leave reset together, or the receiver first.
+// one: TSTAGES registers in the sender and STAGES in the receiver, on the beat's way and on the credit's way back,
+// so that the placer can spread a long distance (or a die crossing) over them. A credit is back after
+// 2 * (TSTAGES + STAGES) + 2 clocks: DEPTH >= 2 * (TSTAGES + STAGES) + 2 keeps a beat per clock (DEPTH a power of
+// two; the default 16 covers 2 + 2 with room). The two halves must leave reset together, or the receiver first.
 // Why: in the first build on AWS (2026-11-03) a register slice's 577 enables were driven by a ready that came,
 // through the multiplexer's logic, from half a die away: -0.881 ns at 250 MHz. A register slice cannot avoid that
 // (its output register must hold when the far side is not ready); credits can.
 module f2_link_tx #(
-  parameter int W     = 8,
-  parameter int DEPTH = 8
+  parameter int W       = 8,
+  parameter int DEPTH   = 16,
+  parameter int TSTAGES = 2
 ) (
   input  logic         clk,
   input  logic         rst,
@@ -219,24 +221,30 @@ module f2_link_tx #(
   input  logic         l_credit                  // from the receiver (a register there): one beat handed on
 );
   localparam int CB = $clog2(DEPTH + 1);
-  logic [CB-1:0] crd;                            // credits: free entries of the receiver's FIFO
-  logic          cr_q;
+  logic [CB-1:0]      crd;                       // credits: free entries of the receiver's FIFO
+  logic [TSTAGES-1:0] v_t, c_t;                  // the beat's way out, the credit's way in
+  logic [W-1:0]       d_t [0:TSTAGES-1];
   assign s_ready = !rst && (crd != '0);           // nothing is taken in reset: it could not be sent
-  always_ff @(posedge clk) begin
-    l_data <= s_data;                            // every clock: the receiver looks at it only with l_valid
+  assign l_valid = v_t[TSTAGES-1];
+  assign l_data  = d_t[TSTAGES-1];
+  always_ff @(posedge clk) begin : g_tx
+    integer i;
+    d_t[0] <= s_data;                            // every clock: the receiver looks at it only with l_valid
+    for (i = 1; i < TSTAGES; i = i + 1) d_t[i] <= d_t[i-1];
     if (rst) begin
-      crd <= CB'(DEPTH); cr_q <= 1'b0; l_valid <= 1'b0;
+      crd <= CB'(DEPTH); v_t <= '0; c_t <= '0;
     end else begin
-      cr_q    <= l_credit;
-      l_valid <= s_valid && s_ready;
-      crd     <= crd - CB'(s_valid && s_ready) + CB'(cr_q);
+      v_t[0] <= s_valid && s_ready;
+      c_t[0] <= l_credit;
+      for (i = 1; i < TSTAGES; i = i + 1) begin v_t[i] <= v_t[i-1]; c_t[i] <= c_t[i-1]; end
+      crd <= crd - CB'(s_valid && s_ready) + CB'(c_t[TSTAGES-1]);
     end
   end
 endmodule
 
 module f2_link_rx #(
   parameter int W      = 8,
-  parameter int DEPTH  = 8,
+  parameter int DEPTH  = 16,
   parameter int STAGES = 2
 ) (
   input  logic         clk,
@@ -287,8 +295,9 @@ module f2_axi_link_m #(
   parameter int IDW    = 16,
   parameter int AW     = 64,
   parameter int DW     = 512,
-  parameter int DEPTH  = 8,
+  parameter int DEPTH  = 16,
   parameter int STAGES = 2,
+  parameter int TSTAGES = 2,
   parameter int FW     = 3 + 2 * (IDW + AW + 8) + (DW + DW / 8 + 1) + 2,
   parameter int BW     = 3 + 2 + (IDW + DW + 3) + (IDW + 2)
 ) (
@@ -330,11 +339,11 @@ module f2_axi_link_m #(
   logic [BB-1:0]  b_d;
   assign fwd = {aw_v, aw_d, w_v, w_d, ar_v, ar_d, r_c, b_c};
   assign {aw_c, w_c, ar_c, r_v, r_d, b_v, b_d} = bwd;
-  f2_link_tx #(.W(AWB), .DEPTH(DEPTH)) u_aw (.clk(clk), .rst(rst), .s_valid(s_awvalid), .s_ready(s_awready),
+  f2_link_tx #(.W(AWB), .DEPTH(DEPTH), .TSTAGES(TSTAGES)) u_aw (.clk(clk), .rst(rst), .s_valid(s_awvalid), .s_ready(s_awready),
     .s_data({s_awid, s_awaddr, s_awlen}), .l_valid(aw_v), .l_data(aw_d), .l_credit(aw_c));
-  f2_link_tx #(.W(WB), .DEPTH(DEPTH)) u_w (.clk(clk), .rst(rst), .s_valid(s_wvalid), .s_ready(s_wready),
+  f2_link_tx #(.W(WB), .DEPTH(DEPTH), .TSTAGES(TSTAGES)) u_w (.clk(clk), .rst(rst), .s_valid(s_wvalid), .s_ready(s_wready),
     .s_data({s_wdata, s_wstrb, s_wlast}), .l_valid(w_v), .l_data(w_d), .l_credit(w_c));
-  f2_link_tx #(.W(AWB), .DEPTH(DEPTH)) u_ar (.clk(clk), .rst(rst), .s_valid(s_arvalid), .s_ready(s_arready),
+  f2_link_tx #(.W(AWB), .DEPTH(DEPTH), .TSTAGES(TSTAGES)) u_ar (.clk(clk), .rst(rst), .s_valid(s_arvalid), .s_ready(s_arready),
     .s_data({s_arid, s_araddr, s_arlen}), .l_valid(ar_v), .l_data(ar_d), .l_credit(ar_c));
   f2_link_rx #(.W(RB), .DEPTH(DEPTH), .STAGES(STAGES)) u_r (.clk(clk), .rst(rst), .l_valid(r_v), .l_data(r_d),
     .l_credit(r_c), .m_valid(s_rvalid), .m_ready(s_rready), .m_data({s_rid, s_rdata, s_rresp, s_rlast}));
@@ -346,8 +355,9 @@ module f2_axi_link_s #(
   parameter int IDW    = 16,
   parameter int AW     = 64,
   parameter int DW     = 512,
-  parameter int DEPTH  = 8,
+  parameter int DEPTH  = 16,
   parameter int STAGES = 2,
+  parameter int TSTAGES = 2,
   parameter int FW     = 3 + 2 * (IDW + AW + 8) + (DW + DW / 8 + 1) + 2,
   parameter int BW     = 3 + 2 + (IDW + DW + 3) + (IDW + 2)
 ) (
@@ -395,9 +405,9 @@ module f2_axi_link_s #(
     .l_credit(w_c), .m_valid(m_wvalid), .m_ready(m_wready), .m_data({m_wdata, m_wstrb, m_wlast}));
   f2_link_rx #(.W(AWB), .DEPTH(DEPTH), .STAGES(STAGES)) u_ar (.clk(clk), .rst(rst), .l_valid(ar_v), .l_data(ar_d),
     .l_credit(ar_c), .m_valid(m_arvalid), .m_ready(m_arready), .m_data({m_arid, m_araddr, m_arlen}));
-  f2_link_tx #(.W(RB), .DEPTH(DEPTH)) u_r (.clk(clk), .rst(rst), .s_valid(m_rvalid), .s_ready(m_rready),
+  f2_link_tx #(.W(RB), .DEPTH(DEPTH), .TSTAGES(TSTAGES)) u_r (.clk(clk), .rst(rst), .s_valid(m_rvalid), .s_ready(m_rready),
     .s_data({m_rid, m_rdata, m_rresp, m_rlast}), .l_valid(r_v), .l_data(r_d), .l_credit(r_c));
-  f2_link_tx #(.W(BB), .DEPTH(DEPTH)) u_b (.clk(clk), .rst(rst), .s_valid(m_bvalid), .s_ready(m_bready),
+  f2_link_tx #(.W(BB), .DEPTH(DEPTH), .TSTAGES(TSTAGES)) u_b (.clk(clk), .rst(rst), .s_valid(m_bvalid), .s_ready(m_bready),
     .s_data({m_bid, m_bresp}), .l_valid(b_v), .l_data(b_d), .l_credit(b_c));
 endmodule
 
@@ -405,8 +415,9 @@ endmodule
 // B {resp}.
 module f2_axil_link_m #(
   parameter int AW     = 32,
-  parameter int DEPTH  = 8,
+  parameter int DEPTH  = 16,
   parameter int STAGES = 2,
+  parameter int TSTAGES = 2,
   parameter int FW     = 3 + 2 * AW + 36 + 2,
   parameter int BW     = 3 + 2 + 34 + 2
 ) (
@@ -439,11 +450,11 @@ module f2_axil_link_m #(
   logic [1:0]    b_d;
   assign fwd = {aw_v, aw_d, w_v, w_d, ar_v, ar_d, r_c, b_c};
   assign {aw_c, w_c, ar_c, r_v, r_d, b_v, b_d} = bwd;
-  f2_link_tx #(.W(AW), .DEPTH(DEPTH)) u_aw (.clk(clk), .rst(rst), .s_valid(s_awvalid), .s_ready(s_awready),
+  f2_link_tx #(.W(AW), .DEPTH(DEPTH), .TSTAGES(TSTAGES)) u_aw (.clk(clk), .rst(rst), .s_valid(s_awvalid), .s_ready(s_awready),
     .s_data(s_awaddr), .l_valid(aw_v), .l_data(aw_d), .l_credit(aw_c));
-  f2_link_tx #(.W(36), .DEPTH(DEPTH)) u_w (.clk(clk), .rst(rst), .s_valid(s_wvalid), .s_ready(s_wready),
+  f2_link_tx #(.W(36), .DEPTH(DEPTH), .TSTAGES(TSTAGES)) u_w (.clk(clk), .rst(rst), .s_valid(s_wvalid), .s_ready(s_wready),
     .s_data({s_wdata, s_wstrb}), .l_valid(w_v), .l_data(w_d), .l_credit(w_c));
-  f2_link_tx #(.W(AW), .DEPTH(DEPTH)) u_ar (.clk(clk), .rst(rst), .s_valid(s_arvalid), .s_ready(s_arready),
+  f2_link_tx #(.W(AW), .DEPTH(DEPTH), .TSTAGES(TSTAGES)) u_ar (.clk(clk), .rst(rst), .s_valid(s_arvalid), .s_ready(s_arready),
     .s_data(s_araddr), .l_valid(ar_v), .l_data(ar_d), .l_credit(ar_c));
   f2_link_rx #(.W(34), .DEPTH(DEPTH), .STAGES(STAGES)) u_r (.clk(clk), .rst(rst), .l_valid(r_v), .l_data(r_d),
     .l_credit(r_c), .m_valid(s_rvalid), .m_ready(s_rready), .m_data({s_rdata, s_rresp}));
@@ -453,8 +464,9 @@ endmodule
 
 module f2_axil_link_s #(
   parameter int AW     = 32,
-  parameter int DEPTH  = 8,
+  parameter int DEPTH  = 16,
   parameter int STAGES = 2,
+  parameter int TSTAGES = 2,
   parameter int FW     = 3 + 2 * AW + 36 + 2,
   parameter int BW     = 3 + 2 + 34 + 2
 ) (
@@ -493,8 +505,8 @@ module f2_axil_link_s #(
     .l_credit(w_c), .m_valid(m_wvalid), .m_ready(m_wready), .m_data({m_wdata, m_wstrb}));
   f2_link_rx #(.W(AW), .DEPTH(DEPTH), .STAGES(STAGES)) u_ar (.clk(clk), .rst(rst), .l_valid(ar_v), .l_data(ar_d),
     .l_credit(ar_c), .m_valid(m_arvalid), .m_ready(m_arready), .m_data(m_araddr));
-  f2_link_tx #(.W(34), .DEPTH(DEPTH)) u_r (.clk(clk), .rst(rst), .s_valid(m_rvalid), .s_ready(m_rready),
+  f2_link_tx #(.W(34), .DEPTH(DEPTH), .TSTAGES(TSTAGES)) u_r (.clk(clk), .rst(rst), .s_valid(m_rvalid), .s_ready(m_rready),
     .s_data({m_rdata, m_rresp}), .l_valid(r_v), .l_data(r_d), .l_credit(r_c));
-  f2_link_tx #(.W(2), .DEPTH(DEPTH)) u_b (.clk(clk), .rst(rst), .s_valid(m_bvalid), .s_ready(m_bready),
+  f2_link_tx #(.W(2), .DEPTH(DEPTH), .TSTAGES(TSTAGES)) u_b (.clk(clk), .rst(rst), .s_valid(m_bvalid), .s_ready(m_bready),
     .s_data(m_bresp), .l_valid(b_v), .l_data(b_d), .l_credit(b_c));
 endmodule
