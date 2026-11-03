@@ -62,7 +62,7 @@ module jpeg_f2_engine #(
   output logic [NL-1:0]           lane_busy,
   output logic [NL-1:0]           lane_done
 );
-  logic [NL-1:0]        start, job_abort, res_ovf, res_axi_err, res_abort;
+  logic [NL-1:0]        start, job_abort, res_ovf, res_axi_err, res_abort, acc, ign;
   logic [NL-1:0][63:0]  in_addr, out_addr, res_hash;
   logic [NL-1:0][31:0]  in_len, out_max, res_cycles, res_in_wait, res_out_wait, res_pixels, res_records;
   logic [NL-1:0][12:0]  res_err;
@@ -74,11 +74,14 @@ module jpeg_f2_engine #(
     .s_wdata(s_wdata), .s_wstrb(s_wstrb), .s_bvalid(s_bvalid), .s_bready(s_bready), .s_bresp(s_bresp),
     .s_arvalid(s_arvalid), .s_arready(s_arready), .s_araddr(s_araddr), .s_rvalid(s_rvalid), .s_rready(s_rready),
     .s_rdata(s_rdata), .s_rresp(s_rresp),
+    .mem_ready(1'b1), .mem_err(32'd0),
     .start(start), .job_abort(job_abort), .in_addr(in_addr), .in_len(in_len), .out_addr(out_addr), .out_max(out_max),
-    .busy(lane_busy), .done(lane_done), .res_err(res_err), .res_ovf(res_ovf), .res_axi_err(res_axi_err),
+    .acc(acc), .ign(ign), .busy(lane_busy), .done(lane_done), .res_err(res_err), .res_ovf(res_ovf), .res_axi_err(res_axi_err),
     .res_abort(res_abort), .res_cycles(res_cycles), .res_in_wait(res_in_wait), .res_out_wait(res_out_wait),
     .res_pixels(res_pixels), .res_records(res_records), .res_hash(res_hash), .res_w(res_w), .res_h(res_h));
 
+  assign acc = start & ~lane_busy;           // the lanes see the start in the same clock: they take it unless busy
+  assign ign = start & lane_busy;
   genvar i;
   generate
     for (i = 0; i < NL; i = i + 1) begin : g_lane

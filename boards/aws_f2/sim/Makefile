@@ -14,6 +14,7 @@ RTL     := $(RTL_DIR)/jpeg_pkg.sv $(RTL_DIR)/jpeg_sdp_ram.sv $(RTL_DIR)/jpeg_blo
 VFLAGS  := -Wall -Wno-fatal -Wno-DECLFILENAME -Wno-UNUSEDSIGNAL -Wno-UNUSEDPARAM -Wno-WIDTH --top-module mem_lane \
            -O2 --x-assign fast --x-initial fast
 all: obj_lane/Vmem_lane obj_lane256/Vmem_lane obj_eng/Vengine obj_eng3/Vengine
+cl: obj_cl/Vcl obj_cl2/Vcl
 ENG := ../mem_lane.sv ../f2_regs.sv ../jpeg_f2_engine.sv
 CHK := ../../../tb/jpeg_checker.sv ../../../tb/jpeg_checker_bind.sv   # the decoder's interface assertions, bound in
 obj_lane/Vmem_lane: $(RTL) ../mem_lane.sv $(CHK) tb_mem_lane.cpp
@@ -33,5 +34,22 @@ obj_eng3/Vengine: $(RTL) $(ENG) $(CHK) tb_engine.cpp
 	verilator $(subst mem_lane,jpeg_f2_engine,$(VFLAGS)) -GNL=3 -GDW=256 -CFLAGS "-DNL=3 -DDW=256" -Mdir obj_eng3 -cc $(RTL) $(ENG) $(CHK) \
 	  --exe tb_engine.cpp -o Vengine > obj_eng3.log 2>&1 || (cat obj_eng3.log; false)
 	$(MAKE) -s -j2 -C obj_eng3 -f Vjpeg_f2_engine.mk Vengine
+# the whole F2 custom logic (../cl_jpeg/design/cl_jpeg.sv) with the HDK's cl_ports.vh: HDK = an aws-fpga checkout
+# (v2.3.5), only its hdk/common/shell_stable/design/interfaces/cl_ports.vh is read. NL_CL lanes (15 as built).
+# obj_cl2: 2 lanes and a commit stamp, for quick runs and the COMMIT register.
+HDK    ?= $(error set HDK to an aws-fpga checkout (hdk/common/shell_stable/design/interfaces/cl_ports.vh))
+NL_CL  ?= 15
+CLRTL  := ../f2_slices.sv ../f2_pcis.sv ../f2_axi_mux.sv ../f2_core.sv ../mem_lane.sv ../f2_regs.sv ../cl_jpeg/design/cl_jpeg.sv sh_ddr_sim.sv
+CLINC  = -I$(HDK)/hdk/common/shell_stable/design/interfaces -I../cl_jpeg/design
+obj_cl/Vcl: $(RTL) $(CLRTL) $(CHK) tb_cl.cpp ../cl_jpeg/design/cl_jpeg_defines.vh ../cl_jpeg/design/cl_id_defines.vh
+	verilator $(subst mem_lane,cl_jpeg,$(VFLAGS)) -Wno-PINCONNECTEMPTY -GNL=$(NL_CL) -CFLAGS "-DNL=$(NL_CL)" $(CLINC) -Mdir obj_cl \
+	  -cc $(RTL) $(CLRTL) $(CHK) --exe tb_cl.cpp -o Vcl > obj_cl.log 2>&1 || (cat obj_cl.log; false)
+	$(MAKE) -s -j2 -C obj_cl -f Vcl_jpeg.mk Vcl
+obj_cl2/Vcl: $(RTL) $(CLRTL) $(CHK) tb_cl.cpp ../cl_jpeg/design/cl_jpeg_defines.vh ../cl_jpeg/design/cl_id_defines.vh
+	verilator $(subst mem_lane,cl_jpeg,$(VFLAGS)) -Wno-PINCONNECTEMPTY -GNL=2 +define+JPEG_F2_COMMIT=32\'h1234ABCD \
+	  -CFLAGS "-DNL=2 -DCOMMIT_EXP=0x1234ABCDu" $(CLINC) -Mdir obj_cl2 \
+	  -cc $(RTL) $(CLRTL) $(CHK) --exe tb_cl.cpp -o Vcl > obj_cl2.log 2>&1 || (cat obj_cl2.log; false)
+	$(MAKE) -s -j2 -C obj_cl2 -f Vcl_jpeg.mk Vcl
+
 clean:
-	rm -rf obj_lane obj_lane.log obj_lane256 obj_lane256.log obj_eng obj_eng.log obj_eng3 obj_eng3.log
+	rm -rf obj_cl obj_cl.log obj_cl2 obj_cl2.log obj_cl_probe obj_cl_probe.log obj_lane obj_lane.log obj_lane256 obj_lane256.log obj_eng obj_eng.log obj_eng3 obj_eng3.log

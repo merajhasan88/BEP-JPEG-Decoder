@@ -1,14 +1,22 @@
-# AWS F2 harness (Task B) - in progress
+# AWS F2 harness (Task B)
 
-Nothing here has run on AWS; nothing is set up there without the owner's go-ahead (ROADMAP.md, Task B,
-where the harness designs are compared). What is here is the vendor-neutral part of option 1 (the HBM
-job engine), simulated with Verilator: the host's view (registers) and the lanes' memory side (AXI4).
+**Image 1 (owner, 2026-11-03: "1) DDR4 with Task B. 2) DDR4 with Proposal A. 3) HBM with Proposal A + Task B"):**
+the batch engine on the F2 card's DDR4, 15 lanes, ready for AWS's build (`cl_jpeg/`); nothing has run on AWS yet,
+and nothing is launched there without the owner's go-ahead and a cost given first. The vendor-neutral parts were
+written and simulated first (2026-10-10: the lanes and the job engine); the custom logic (CL) for AWS's small shell
+and its tests followed on 2026-11-03.
 
 | file | what it is |
 |---|---|
 | `mem_lane.sv` | one decoder lane that works from memory: a job (file address and length, output area) is read with an AXI4 read master, decoded by the wide core (`jpeg_decoder FAST=2`, RGB) and written as 16-byte records {x, y, 4 x RGB} with an AXI4 write master (256- or 512-bit data); reports clocks, input / output waits, pixels, records, error bits and a hash that binds each colour to its position. Jobs run back to back without a reset; a job's inputs are sampled at its start; the lane stops reading at the frame's end and says done only when no burst is in flight; a job can be aborted (a file that ends at or before its SOI never ends a frame) |
 | `f2_regs.sv` | the register file on an AXI-Lite slave (on F2: the shell's OCL port): per lane the next job, a tag, start / abort, status, results, and the engine clock at start and at done; globally an ID, the lane count, a free-running 64-bit clock, DONE / BUSY masks. Map in the file's header |
 | `jpeg_f2_engine.sv` | `f2_regs` plus NL lanes, each with its own AXI4 master port (on F2: one HBM channel per lane) |
+| `f2_core.sv` | the CL's logic between the shell's ports and the memory: NL lanes (each with registered job inputs, a register slice on its memory port and its own reset register), `f2_regs` on OCL, `f2_pcis` on PCIS, and `f2_axi_mux` onto one AXI4 port (on F2: the DDR4). Vendor-neutral |
+| `f2_axi_mux.sv` | NM AXI4 masters onto one slave: round-robin AR and AW (the grant registered one clock ahead), the W bursts in the order of their addresses (AXI4 has no WID), R and B routed back by ID (the master's index); the slave may reorder answers across IDs and interleave read bursts |
+| `f2_pcis.sv` | the host's memory port: the shell's PCIS (BAR4, 512-bit AXI4) as one master of the multiplexer - addresses aligned down to 64 bytes (the byte strobes and byte lanes carry the alignment) and reduced to 64 GiB, the shell's IDs returned in order from two FIFOs; until the memory is ready every request is answered here with SLVERR (reads: zeros) and counted, so no access can hang the shell's 8 us timeout |
+| `f2_slices.sv` | register slices (every valid, data and ready leaves a flip-flop) for AXI4 and AXI-Lite, and a plain pipeline |
+| `cl_jpeg/` | the CL for AWS's HDK (folder name = CL name = top module, as the HDK requires): `design/cl_jpeg.sv` (the shell's ports from the HDK's `cl_ports.vh`, included, not copied; AWS's `sh_ddr` wired as in AWS's examples; every unused interface idle), `design/cl_id_defines.vh` (PCIe IDs 0xF0A1/0x1D0F, 0x1D51/0xFEDC), `design/cl_jpeg_defines.vh` (the commit stamp), `build/` (our `encrypt.tcl` and `synth_cl_jpeg.tcl` for the HDK's flow, the constraints: placement in SLR1 next to the shell and SLR2 next to the DDR4), `verif/` (AWS's XSIM test), `build_on_aws.sh` (the build on AWS's FPGA Developer AMI), `local_check.tcl` (the free checks on this machine) |
+| `sim/tb_cl.cpp`, `sim/run_cl_tests.py`, `sim/sh_ddr_sim.sv` | the whole CL, its real top level with `cl_ports.vh`, in Verilator: the testbench plays the F2 host and AWS's shell on every port, with the DDR4 as a model behind a stand-in `sh_ddr` (same module name and ports). Below |
 | `sim/tb_mem_lane.cpp` | one lane, a list of jobs back to back, against an AXI4 memory model with random delays and gaps on every channel: every pixel placed by x and y and compared with the golden image, the hash recomputed; the job inputs change and a start is pulsed while a job runs; at done nothing may be outstanding on the memory side |
 | `sim/run_lane_tests.py` | the job list: every corpus file (the 2 unsupported ones must end with ERR_SOF_TYPE and no pixels), the 50 malformed cases (bits and pixels as `tb/malformed/cases.json`), the 230 cut files of `tb/run_trunc_tests.py` (ERR_TRUNC; a 1-2 byte cut never starts a frame and is aborted), files with zeros after their EOI, a file without an SOI and three mid-frame aborts, an output area too small (res_ovf) - each special job followed by a clean file; 256- and 512-bit data, with 0, 30 (two seeds) and 60 % gaps |
 | `sim/tb_engine.cpp`, `sim/run_engine_tests.py` | the engine driven as the host would: files into memory first (on F2: PCIS writes), jobs by register (every access waits `--host-lat` clocks, a stand-in for a PCIe round trip), DONE polled, results and records read and checked as above; also the tags, the start counters, a start written while busy (ignored and counted), the ID / scratch / clock registers. Jobs in file order or largest first; reports the batch's wall clocks (engine clock, first start to last done) against the lower bound max(longest job, sum / NL) |
@@ -48,3 +56,117 @@ photos (millions of clocks each) that cost is small, and a descriptor queue woul
 Not here (F2-specific, on AWS's build image): the shell's ports, the HBM IP and its AXI3 ports (each lane
 keeps INCR bursts of at most 16 beats inside 4 KB and a single ID, which AXI3 slaves accept; WID tied
 off), clock crossings, PCIS into HBM, and the host program.
+
+## Image 1: the CL on AWS F2 (DDR4, 15 lanes)
+
+**What it is.** `cl_jpeg/design/cl_jpeg.sv` for AWS's small shell (aws-fpga HDK v2.3.5, shell 0x10212415), one clock
+(the shell's `clk_main_a0`, 250 MHz), no HBM, no PCIM, no interrupts:
+
+- The host writes JPEG files into the card's 64 GiB DDR4 through **BAR4** (the shell's PCIS port; a BAR4 offset is a
+  DDR4 address).
+- It gives each lane a job through **BAR0** (OCL; the register map is in `f2_regs.sv`'s header, version 2).
+- Each lane reads its file from DDR4, decodes it with the wide core and writes its pixels back as records. The host
+  reads the records over BAR4, or keeps the hash only: the throughput mode, an output area of 0 bytes.
+- The DDR4 controller is AWS's `sh_ddr` (AMD's DDR4 IP, AWS's settings), wired as in AWS's examples. Its resets come
+  from `rst_main_n` only, and its statistics bus runs through 8 registers each way.
+- The global registers hold the ID, VERSION 2, LANES 15 and DW 512, plus:
+  - STATUS bit 0: the DDR4 is calibrated. The host must not touch BAR4 before; anything earlier is answered with
+    SLVERR and counted in MEM_ERR.
+  - COMMIT: the first 8 hex digits of the commit built.
+- The virtual LEDs (`fpga-get-virtual-led`) show, from bit 0: DDR4 ready, memory on, any lane busy, any lane done.
+
+**The host's rules on F2** (for the host program, not written yet):
+- Check STATUS bit 0 before the first BAR4 access.
+- Put each file at a 64-byte-aligned address (mem_lane reads whole beats from its job's address).
+- **Pad each file to a whole number of 64-byte beats** with zeros, and **zero each output area once before its first
+  job** (full-beat BAR4 writes). The F2 card's DDR4 has ECC, so a write that fills only part of a beat (the last beat
+  of a file, the last beat of a job's records) makes the controller read the old contents first. Unwritten memory can
+  then report ECC errors.
+- Read a job's records up to RECORDS (bytes after them in the last beat are not the job's).
+
+**Bandwidth.** One DDR4 channel gives about 19 GB/s on paper. 15 lanes writing every pixel (4 bytes each as records)
+want up to 4 GB/s per lane at 250 MHz, so full-output runs are paced by the memory; the hash-only runs are not (the
+lanes read about 0.15 GB/s each). Image 3 (HBM, one channel per lane) removes that limit.
+
+**Placement.** The shell's OCL and PCIS ports sit on the middle die (SLR1), the DDR4 pins on the top die (SLR2):
+- `SH_SIDE`, the first register stage of OCL, PCIS and the reset, stays in SLR1.
+- The core (`CORE`), its slice to the DDR4 (`DDR_SLC`), `SH_DDR` and its pipes go to SLR2.
+
+So every die crossing runs register to register (`cl_jpeg/build/constraints/small_shell_cl_pnr_user.xdc`).
+
+**Tests here (Verilator, `sim/`).**
+```sh
+cd boards/aws_f2/sim && make cl HDK=<an aws-fpga v2.3.5 checkout>     # obj_cl (15 lanes), obj_cl2 (2 lanes, a commit stamp)
+python3 run_cl_tests.py [--photos]
+```
+
+`tb_cl.cpp` simulates the real top level unchanged: `cl_jpeg.sv` with the HDK's `cl_ports.vh`. It plays the host and
+AWS's shell on every port, as the shell specification describes them:
+
+- **BAR4 writes** come write-combined: pieces of 1-512 bytes at any alignment, partial byte strobes, never across 4 KB.
+  Up to 32 are in flight per direction, the shell's IDs vary, and W data sometimes arrives before its AW.
+- **The 8 us limit:** every BAR4 transaction must complete within 2,000 clocks of its valid (the shell's 8 us timeout),
+  and must return its own ID.
+- **OCL accesses** come one at a time, 100 clocks apart, with AW and W skewed at random.
+- **Every channel** has random gaps.
+- **The DDR4 model** answers out of order across IDs and interleaves read bursts. It checks every burst: 64-byte
+  beats, INCR, aligned, inside 4 KB, IDs of the multiplexer's masters only, wlast on the right beat.
+- **Each run also checks:**
+  - before the DDR4 is ready: SLVERR, zeros, MEM_ERR counted, the memory untouched;
+  - BAR4 at any alignment, 70 KB written and read back in pieces of other sizes;
+  - every file arriving intact;
+  - the FLR answer and the DDR4 statistics bus through its pipes.
+- **The job flow** is `tb_engine.cpp`'s. Each job's hash is compared with the golden image's hash (the F2 host's own
+  check), and its records are read back and placed by x and y: from the memory model in full, and over BAR4 for the
+  first 2 KB.
+
+**AWS's own test (`cl_jpeg/verif/`).** `cl_jpeg_test.sv` runs in AWS's XSIM testbench on the build machine, before
+the DCP build: AWS's shell model, AWS's `sh_ddr` simulation model and the DDR4 DIMM model.
+- ID and registers checked; the DDR4's ready bit polled.
+- Two corpus files (`adp_16x16_q25_420`, `adp_45x37_q30_420_rst2`) written over PCIS and decoded at once on lanes 0
+  and 1.
+- Every record read back over PCIS: each pixel exactly once, the hash recomputed = the lane's HASH register = the
+  golden image's hash (`verif/tests/cl_jpeg_test_data.svh`, from `verif/scripts/gen_test_data.py`).
+- AWS's protocol checkers on the shell's interfaces count as failures.
+
+**Free checks on this machine (`cl_jpeg/local_check.tcl`, Vivado 2026.1, a Kintex UltraScale+ KU5P -2 standing in for
+F2's VU47P -2).**
+- `elab`: the top level elaborated with the real `cl_ports.vh`, and every cell the placement constraints name present.
+- `lane`, `synth`, `place`, `route`: the core with 15 lanes at 4.0 ns.
+
+Each stage runs as its own process, from a clean checkout of one commit (sources checked by
+`boards/acorn_cle215/provenance.tcl`).
+
+### Building the image on AWS (the owner's go-ahead first; the cost is given before anything is launched)
+
+1. **Here:** `boards/aws_f2/cl_jpeg/package.sh <commit>` writes `bepjpeg_f2_<8 hex>.tar.gz`. It is that commit's
+   `rtl/` and `boards/aws_f2/` plus a file `COMMIT`.
+2. **AWS (us-east-1):** launch one r6i.2xlarge (8 vCPUs, 64 GiB; AWS asks for at least 32 GiB) from **FPGA Developer AMI
+   1.19.x, Ubuntu 24.04, Vivado 2025.2**. The Marketplace subscription is free; the AMI includes the Vivado licence for
+   the VU47P. Allow SSH from one address, no Elastic IP.
+3. **Copy and start:** copy the tarball to the instance, unpack it, and inside `tmux` (so a dropped SSH connection does
+   not stop it) run `boards/aws_f2/cl_jpeg/build_on_aws.sh`. Its steps:
+   - aws-fpga v2.3.5 and `hdk_setup.sh`;
+   - the commit stamp;
+   - AWS's XSIM test (stops unless "TEST PASSED");
+   - the DCP build: `aws_build_dcp_from_cl.py -c cl_jpeg --no-encrypt`; our sources are open;
+   - the timing check: a build that fails timing (`post_route.VIOLATED.dcp`) stops there, and no AFI is made from it
+     without the owner's explicit yes.
+
+   It prints the tarball `<tag>.Developer_CL.tar` and its sha256.
+4. **Copy back** `~/bepjpeg_f2/logs`, `cl_jpeg/build/reports` and the tarball. They go to
+   `/media/developer/HIKSEMI/Vivado/builds/f2_<8 hex>/`, after `mountpoint -q /media/developer/HIKSEMI`.
+5. **The AFI.** Upload the tarball to an S3 bucket in us-east-1 (with a logs folder), then:
+   `aws ec2 create-fpga-image --region us-east-1 --name bep-jpeg-<8 hex> --description "BEP-JPEG image 1: 15 wide lanes on DDR4, commit <hash>, dcp sha256 <...>" --input-storage-location Bucket=<b>,Key=<folder>/<tar> --logs-storage-location Bucket=<b>,Key=<logs folder>/`
+   This works from any machine with the account's credentials. AFI creation is free and takes about an hour on AWS's
+   side; `aws ec2 describe-fpga-images --fpga-image-ids <afi-...>` shows when it is `available`.
+6. **Terminate the instance** (its disk goes with it). The S3 bucket may stay.
+
+**Cost (2026-11-03 prices, us-east-1):**
+- r6i.2xlarge $0.504/h for about 3.5-5 h (setup ~0.5 h, AWS's XSIM test 0.5-1 h, the build 2.5-3.5 h with 15 lanes);
+- its disk and public address about $0.03/h;
+- S3 a few cents a month;
+- AFI creation free.
+
+About $2-3 per attempt. Running it needs an f2.6xlarge ($1.98/h) and the F-instance quota of 24 vCPUs (8 granted as of
+2026-11-03).

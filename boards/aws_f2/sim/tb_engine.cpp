@@ -270,7 +270,7 @@ int main(int argc, char** argv) {
     d->rst = 0; tick(nullptr);
 
     // ---- the host's first checks
-    bool id_ok = lite_read(R_ID) == 0x4A504547 && lite_read(R_VERSION) == 1 && lite_read(R_LANES) == NL && lite_read(R_DW) == DW;
+    bool id_ok = lite_read(R_ID) == 0x4A504547 && lite_read(R_VERSION) == 2 && lite_read(R_LANES) == NL && lite_read(R_DW) == DW;
     lite_write(R_SCRATCH, 0xC0FFEE11); id_ok = id_ok && lite_read(R_SCRATCH) == 0xC0FFEE11;
     uint32_t c0 = lite_read(R_CLOCK_LO); uint32_t c0h = lite_read(R_CLOCK_HI); uint32_t c1 = lite_read(R_CLOCK_LO);
     id_ok = id_ok && c0h == 0 && c1 > c0;

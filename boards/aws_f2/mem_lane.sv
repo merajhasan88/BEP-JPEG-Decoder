@@ -214,7 +214,7 @@ module mem_lane #(
     z = (z ^ (z >> 27)) + (z << 13);
     return z ^ (z >> 31);
   endfunction
-  logic [63:0] hv [0:3];                         // stage 1: the beat's pixels, mixed
+  logic [63:0] h_v [0:3];                        // stage 1: the beat's pixels, mixed
   logic [3:0]  hm;                               //          which of them exist
   logic [63:0] hs;                               // stage 2: their sum
   logic        h1, h2;
@@ -222,10 +222,10 @@ module mem_lane #(
     integer i;
     h1 <= px_fire; h2 <= h1;
     for (i = 0; i < 4; i = i + 1) begin
-      hv[i] <= mix({px_y, px_x + 16'(i), 8'd0, px_c0[8*i +: 8], px_c1[8*i +: 8], px_c2[8*i +: 8]});
+      h_v[i] <= mix({px_y, px_x + 16'(i), 8'd0, px_c0[8*i +: 8], px_c1[8*i +: 8], px_c2[8*i +: 8]});
       hm[i] <= (i < px_n);
     end
-    hs <= (hm[0] ? hv[0] : 64'd0) + (hm[1] ? hv[1] : 64'd0) + (hm[2] ? hv[2] : 64'd0) + (hm[3] ? hv[3] : 64'd0);
+    hs <= (hm[0] ? h_v[0] : 64'd0) + (hm[1] ? h_v[1] : 64'd0) + (hm[2] ? h_v[2] : 64'd0) + (hm[3] ? h_v[3] : 64'd0);
   end
 
   // ================================================================ control

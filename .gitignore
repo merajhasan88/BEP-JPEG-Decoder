@@ -89,3 +89,12 @@ bench/build/
 
 # performance model: blockstats binary, per-block statistics, 4:2:0 copies, sweep results
 model/perf/build/
+
+# AWS F2 builds (made on AWS's build machine by the HDK's flow, boards/aws_f2/cl_jpeg/build_on_aws.sh)
+boards/aws_f2/cl_jpeg/build/checkpoints/
+boards/aws_f2/cl_jpeg/build/reports/
+boards/aws_f2/cl_jpeg/build/src_post_encryption/
+boards/aws_f2/cl_jpeg/build/constraints/generated_cl_clocks_aws.xdc
+boards/aws_f2/cl_jpeg/build/scripts/*.log
+boards/aws_f2/cl_jpeg/build/scripts/*.jou
+boards/aws_f2/cl_jpeg/verif/sim/

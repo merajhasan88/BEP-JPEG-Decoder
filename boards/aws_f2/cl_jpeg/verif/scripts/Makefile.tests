@@ -1,0 +1,3 @@
+# Makefile.tests - the CL's tests (read by the HDK's Makefile.header.inc)
+cl_jpeg_test: TEST=cl_jpeg_test
+cl_jpeg_test: all

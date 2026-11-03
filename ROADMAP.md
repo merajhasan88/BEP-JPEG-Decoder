@@ -8,7 +8,7 @@ request; the names are the owner's.
 | **Proposal A** | split the stream of one image that has no restart markers, so several decoders can share one photo | research started 2026-10-04 after 22:40 PKT (owner: "sure go ahead keeping in mind the load on the laptop's cores") |
 | **Proposal B** | a way around the Huffman loop limit (one code per clock) | research started with A, in parallel |
 | **Task A** | batched mode of the wide core on fpgas.online Welland | **done 2026-10-05**: 15 wide decoders at 150 MHz (-3 grade), 18/18 identical to libjpeg 9e on the board, 372 photos/s on adapter.jpg; details below and in `boards/acorn_cle215/README.md` |
-| **Task B** | all tests on AWS F2 | last; nothing is set up on AWS without the owner's go-ahead |
+| **Task B** | all tests on AWS F2 | three images in the owner's order (2026-11-03): 1) the batch engine on DDR4, 2) Proposal A on DDR4, 3) HBM with A and the batch engine; image 1 prepared and simulated (`boards/aws_f2/cl_jpeg`); nothing is set up on AWS without the owner's go-ahead and a cost given first |
 | **Review 2026-10-10** | external review of the 10 October hand-over (`../jpeg-decoder-review-2026-10-10.md`) | four defects: three fixed and verified the same day, the fourth (board checksum) described; see "Review of 2026-10-10" below |
 
 Research, measurements, estimates and the plan for both proposals: `PROPOSALS.md`.
@@ -175,3 +175,25 @@ Owner: "In parallel (pun intended) lets find a way around Huffman loop limitatio
     a host would run them; the 24 photo files as one batch on 4 lanes, all identical to libjpeg 9e, in 1.013 (largest
     first) to 1.039 (file order) times the lower bound of the engine clock (memory bandwidth not modelled). Option 2 would replace the lanes' read side only; the registers stay. Not built: the shell,
     HBM and clocking, the host program (on AWS's build image, after the owner's choice).
+- **The owner's plan (2026-11-03): three images, in order.**
+  1. **The batch engine on DDR4.**
+  2. **Proposal A on DDR4.** Its decoder time per photo is compared with image 1's on the same F2 (owner: "My plan is
+     to compare split 1's decoder time on F2 with split 2's").
+  3. **HBM with Proposal A and the batch engine**, one channel per lane.
+
+  Why DDR4 first: AWS's DDR4 controller (`sh_ddr`) has to be in every CL anyway, two of AWS's examples wire it the way
+  we do, and AWS's simulation model of it is a plain memory. All the logic around it is ours and simulates here in
+  full. The HBM path (AMD's IP at 450 MHz with converters, AWS's monitor connection) first compiles on the paid build
+  machine and has five open items in AWS's known-issues list.
+
+  What DDR4 costs: one channel of about 19 GB/s on paper cannot take 15 lanes' full RGB output (about 20-44 GB/s at
+  250 MHz). Throughput runs therefore keep the hash only (the position-binding hash proves every pixel), and
+  full-output runs are paced by the memory. Proposal A's 8 lanes (4-11 GB/s) fit.
+- **Image 1 (`boards/aws_f2/cl_jpeg`, 2026-11-03).** The CL for AWS's small shell: 15 lanes on the DDR4, the
+  registers on OCL, the host's memory port on PCIS, one clock (250 MHz), the shell's ports from the HDK's
+  `cl_ports.vh`.
+  - Simulated here at the real top level with the shell's behaviour on every port (`sim/tb_cl.cpp`); results in
+    `boards/aws_f2/README.md`.
+  - AWS's own XSIM test of it runs on the build machine before the build.
+  - The build script stops on a failed simulation or a failed timing check.
+  - Steps and cost (about $2-3 per attempt) are in `boards/aws_f2/README.md`.
