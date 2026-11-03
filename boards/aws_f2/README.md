@@ -122,9 +122,14 @@ AWS's shell on every port, as the shell specification describes them:
 
 **AWS's own test (`cl_jpeg/verif/`).** `cl_jpeg_test.sv` runs in AWS's XSIM testbench on the build machine, before
 the DCP build: AWS's shell model, AWS's `sh_ddr` simulation model and the DDR4 DIMM model.
-- ID and registers checked; the DDR4's ready bit polled.
-- Two corpus files (`adp_16x16_q25_420`, `adp_45x37_q30_420_rst2`) written over PCIS and decoded at once on lanes 0
-  and 1.
+- ID and registers checked.
+- The DDR4's calibration started over its statistics bus (register 0x0C written 0, 1, 0, as AWS's own tests do in
+  `initialize_ddr()`), then the ready bit polled for at most about 1 ms of simulated time. On the card the shell does
+  this when the image is loaded; AWS's shell model does not, and without it the DDR4 never became ready (the first run
+  on AWS, 2026-11-03: 85 minutes of a 20 ms wait). The local stand-in `sim/sh_ddr_sim.sv` makes the DDR4 ready after a
+  fixed delay instead, which is why the local runs could not catch it.
+- Two corpus files (`adp_16x16_q25_420`, `adp_45x37_q30_420_rst2`) written over PCIS, both output areas zeroed (the
+  host's rules above), the files read back over PCIS, then decoded at once on lanes 0 and 1.
 - Every record read back over PCIS: each pixel exactly once, the hash recomputed = the lane's HASH register = the
   golden image's hash (`verif/tests/cl_jpeg_test_data.svh`, from `verif/scripts/gen_test_data.py`).
 - AWS's protocol checkers on the shell's interfaces count as failures.
