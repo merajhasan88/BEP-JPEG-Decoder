@@ -311,6 +311,8 @@ default `SSI_SpreadLogic_high` had spread the core over its die), the gate after
 - The tarball `2026_11_03-170850.Developer_CL.tar`, sha256 7e2b9ca36705f3ee65b497036ec847f56363a0e8337b7550e3cb32bb837cbe59,
   is in the private S3 bucket (`dcp/`); reports, logs and the tarball on the SSD:
   `/media/developer/HIKSEMI/Vivado/builds/f2_aws_0aa3cd65/`.
-- The AFI was requested at 18:33 UTC: afi-0385ad594097d39f3 / agfi-0db16f77a44ec64f8 (name bep-jpeg-0aa3cd65).
+- The AFI was requested at 18:33 UTC and was **available** at 18:59 UTC: afi-0385ad594097d39f3 /
+  agfi-0db16f77a44ec64f8 (name bep-jpeg-0aa3cd65, private; shell 0x10212415; PCI IDs 0xF0A1/0x1D0F, 0x1D51/0xFEDC
+  as in `cl_id_defines.vh`).
   Next: an F2 run (`fpga-load-local-image -S 0 -I agfi-0db16f77a44ec64f8` on an f2.6xlarge) with a host program
   (not written yet) - after a quota increase to 24 vCPUs and the owner's go-ahead with its cost.
