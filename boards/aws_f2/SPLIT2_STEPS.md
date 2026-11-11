@@ -61,6 +61,27 @@ The owner approved the plan of 2026-11-11 ("Cap of $2 ... proceed"). Where it di
   - pass 1's clocks here equal the Acorn board's (732,940 against 732,974 on adapter.jpg);
   - the one-lane decode equals split 1's simulation to within 2 clocks.
 
+## Result (2026-11-11/12): split 2 built, AFI available
+
+- **What was built.** Proposal A as split 2's CL, on the local branch proposals-AB: `boards/aws_f2/cl_split/`,
+  `f2_split_core.sv`, commit 36066ca. The controller runs at 125 MHz from an MMCM on clk_hbm_ref, and the 8 lanes at
+  250 MHz.
+- **Checks before AWS (all free).** Proposal A at 512 bits, and the whole CL in Verilator and in 4-state xsim, all
+  matching libjpeg 9e. On the KU5P: local timing, the crossings and the scoped link. Along the way they found:
+  - an xvlog error in jpeg_split1.sv that AWS's XSIM test would have hit;
+  - the links between the dies merged into shift registers (now `shreg_extract` "no");
+  - a fragile watch in the build script.
+- **On AWS**, one r6i.2xlarge, 20:39-22:15 UTC, **about $0.85** (the owner's cap: $2):
+  - AWS's XSIM test passed;
+  - the stop after logic optimisation passed at +0.711 ns, and the one after placement at +0.374 ns;
+  - **timing met after routing: +0.055 ns**, TNS 0, hold +0.010 ns (split 1: +0.015 ns);
+  - the routed design's clock crossings were all within their 4 ns bound.
+- **AFI afi-0ade074ec918718f6, AGFI agfi-07804e57da9cd093b**: private, PCI IDs 0xF0A2/0x1D52, available 22:39 UTC.
+- **The 100 MHz fallback** (the controller on clk_hbm_ref, no MMCM) was prepared and checked on the local branch
+  split2-ctl100 (1a03607). It was not needed, since the MMCM placed.
+- **Details**: proposals-AB's `boards/aws_f2/README.md`, "Image 2". Still to do for both splits: the host program, the
+  F-instance quota (24 vCPUs), and the runs on an F2 card.
+
 ## Where things stand (2026-11-03)
 
 - Split 1: the image is built (commit 0aa3cd6, timing met at 250 MHz with +0.015 ns, AFI afi-0385ad594097d39f3 /
