@@ -46,7 +46,8 @@ The owner approved the plan of 2026-11-11 ("Cap of $2 ... proceed"). Where it di
 - If the MMCM is used: its lock run in local xsim, to size the AWS test's wait.
 - The full CL's local check: every path between the two clocks under the max-delay constraint.
 
-**The prediction behind the clock choice.** Planning estimates of 2026-11-11:
+**The prediction behind the clock choice.** Planning estimates of 2026-11-11 (the run and its results: proposals-AB
+`model/split/f2_clock_ratios.py`, `f2_clock_ratios_2026-11-11.json`; a copy on the SSD in `f2s_aws_36066ca4/planning/`):
 - split 2: `tb/obj_splittop8` of 2026-10-13 (P = 8, DW = 128), the testbench's memory without row-switch cost;
 - split 1: its own simulation of 0aa3cd6.
 
@@ -56,7 +57,8 @@ The owner approved the plan of 2026-11-11 ("Cap of $2 ... proceed"). Where it di
 | adapter.jpg (3.5 MB) | 24.20 ms | 11.39 ms | 9.12 ms | 5.87 ms |
 
 - These are times per photo. Split 1 decodes 15 photos at once, so it stays ahead in photos per second.
-- Pass 1 is 51-64 % of split 2's time. It runs on the controller's clock, at about 0.6 byte per clock per skimmer.
+- Pass 1 is 51-64 % of split 2's time at 125 MHz on these two photos (51-65 % over the 12 photos in the whole CL's
+  simulation). It runs on the controller's clock, at about 0.6 byte per clock per skimmer.
 - The estimates check out against measurements:
   - pass 1's clocks here equal the Acorn board's (732,940 against 732,974 on adapter.jpg);
   - the one-lane decode equals split 1's simulation to within 2 clocks.

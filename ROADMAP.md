@@ -8,7 +8,7 @@ request; the names are the owner's.
 | **Proposal A** | split the stream of one image that has no restart markers, so several decoders can share one photo | research started 2026-10-04 after 22:40 PKT (owner: "sure go ahead keeping in mind the load on the laptop's cores") |
 | **Proposal B** | a way around the Huffman loop limit (one code per clock) | research started with A, in parallel |
 | **Task A** | batched mode of the wide core on fpgas.online Welland | **done 2026-10-05**: 15 wide decoders at 150 MHz (-3 grade), 18/18 identical to libjpeg 9e on the board, 372 photos/s on adapter.jpg; details below and in `boards/acorn_cle215/README.md` |
-| **Task B** | all tests on AWS F2 | three images in the owner's order (2026-11-03): 1) the batch engine on DDR4, 2) Proposal A on DDR4, 3) HBM with A and the batch engine; image 1 prepared and simulated (`boards/aws_f2/cl_jpeg`); its first AWS build (2026-11-03) failed timing at placement, mostly in `mem_lane.sv`; the second (0aa3cd6, the same day) met timing at 250 MHz: AFI afi-0385ad594097d39f3 / agfi-0db16f77a44ec64f8, not yet run on an F2 card (`boards/aws_f2/README.md`); nothing is set up on AWS without the owner's go-ahead and a cost given first |
+| **Task B** | all tests on AWS F2 | three images in the owner's order (2026-11-03): 1) the batch engine on DDR4, 2) Proposal A on DDR4, 3) HBM with A and the batch engine; image 1 prepared and simulated (`boards/aws_f2/cl_jpeg`); its first AWS build (2026-11-03) failed timing at placement, mostly in `mem_lane.sv`; the second (0aa3cd6, the same day) met timing at 250 MHz: AFI afi-0385ad594097d39f3 / agfi-0db16f77a44ec64f8 (`boards/aws_f2/README.md`); image 2 (Proposal A on the local branch proposals-AB, 36066ca) built 2026-11-11: timing met at 250 MHz (+0.055 ns), AFI afi-0ade074ec918718f6 / agfi-07804e57da9cd093b, about $0.85 (`boards/aws_f2/SPLIT2_STEPS.md`, "Result"); neither image yet run on an F2 card (no host program; the F-instance quota is 8 of the 24 vCPUs an f2.6xlarge needs); nothing is set up on AWS without the owner's go-ahead and a cost given first |
 | **Review 2026-10-10** | external review of the 10 October hand-over (`../jpeg-decoder-review-2026-10-10.md`) | four defects: three fixed and verified the same day, the fourth (board checksum) described; see "Review of 2026-10-10" below |
 
 Research, measurements, estimates and the plan for both proposals: `PROPOSALS.md`.
@@ -207,3 +207,12 @@ Owner: "In parallel (pun intended) lets find a way around Huffman loop limitatio
     between the dies, the reset tree, a pipelined register file; placement `ExtraTimingOpt`): timing met at 250 MHz
     (+0.015 ns after routing), AFI afi-0385ad594097d39f3 / agfi-0db16f77a44ec64f8; about $0.82. Next: a host program
     and an F2 run (an f2.6xlarge needs a quota of 24 vCPUs; 8 granted).
+- **Image 2 (split 2, Proposal A on DDR4; its design only on the local branch proposals-AB), 2026-11-11.**
+  - What it is: A's controller at 125 MHz from an MMCM on clk_hbm_ref, 8 lanes at 250 MHz, the hash only.
+  - AWS build of 36066ca: AWS's XSIM test passed and timing was met at 250 MHz (+0.055 ns after routing). The crossings
+    between the two clocks were all bounded in the routed design.
+  - AFI afi-0ade074ec918718f6 / agfi-07804e57da9cd093b; about $0.85 (cap $2).
+  - The 100 MHz fallback (branch split2-ctl100, 1a03607) was not needed.
+  - Simulated decode times: 5.4-12.2 ms per 12 MP photo, against split 1's 15.3-24.2 ms on one lane.
+  - Next, for both images: a host program and an F2 run, each after the owner's go-ahead with its cost.
+  - Details: `boards/aws_f2/SPLIT2_STEPS.md`, "Result".
