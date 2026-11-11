@@ -7,6 +7,60 @@ This file lists what split 2 needs, in order, so that no money is spent on a run
 stopped. It comes from split 1 (`README.md`: "First build on AWS", "Second build on AWS"). Nothing on AWS is
 started without the owner's go-ahead and a cost given first.
 
+## Decisions (owner, 2026-11-11)
+
+The owner approved the plan of 2026-11-11 ("Cap of $2 ... proceed"). Where it differs from Step 1 below (written on
+11-03), this section holds.
+
+1. **Clocks.** A's controller (pass 1, the reader, the composers) gets its own clock. The 8 lanes' decoders stay on
+   `clk_main_a0` (250 MHz).
+   - **125 MHz from an MMCM in the CL** if the local estimate (below) gives the controller, with the 512-bit reader, at
+     least +1 ns at 8 ns. Otherwise **`clk_hbm_ref` (100 MHz) directly**, with no MMCM.
+   - The MMCM takes `clk_hbm_ref` as its input, as AWS's own clock generator does (`aws_clk_gen.sv`, used by
+     `cl_mem_perf`).
+   - Both shell clocks come from MMCMs inside the shell (`IO_SHIM/MMCM_CLK_HBM_REF`, `IO_SHIM/RL_CLKS/MMCM_CLK_MAIN_A`),
+     so a CL MMCM on either one is a cascade. AWS's files show only the one on `clk_hbm_ref`: `mmcm_cascade.xdc`, whose
+     read is commented out in v2.3.5's `build_level_1_cl.tcl`.
+   - The small shell does run `clk_hbm_ref`. In split 1's build (0aa3cd6, `post_route_timing.rpt`) it comes in on pin
+     BJ4, goes through the shell's MMCM_X0Y2 and clocks 232 of the shell's flip-flops.
+   - Not AWS_CLK_GEN: it needs the SDA port, more IPs, and a host call to release the resets.
+   - Every crossing between the two clocks goes through `jpeg_cdc_fifo`, constrained as on the Acorn
+     (`set_max_delay -datapath_only` between the two clocks), with no clock group on that pair.
+2. **Pixels:** hash only.
+3. **Lanes:** P = 8.
+4. **Width:** the reader at 512 bits, in bursts of 4 beats: 256 bytes, the same as the Acorn's 16 x 16 bytes.
+5. **Branch:** the development branch is merged into proposals-AB, and split 2 is built from a proposals-AB commit.
+   Nothing is pushed.
+6. **Proposal A's sources on AWS** (a private instance, the private bucket, a private AFI): asked again with the launch
+   quote.
+7. **Money:** at most **$2** for split 2 on AWS.
+   - No second build without the owner's yes, and a fresh quote before the launch.
+   - $2 covers a build stopped by the gate (~$0.7) plus a full build (~$0.9), or two full builds only just.
+
+**Gates before any money is spent.** If one fails, stop and ask the owner.
+- Right after the merge, A alone on the KU5P (out of context, after synthesis, the two clocks declared unrelated so
+  that the crossings do not hide the rest):
+  - the lanes' side at 4.0 ns: at least +1.3 ns. The resume decoder has never been timed on UltraScale+. Split 1 had
+    +1.3 ns overall and +1.4 ns inside the decoder after synthesis, and ended at +0.015 ns on AWS.
+  - the controller at 8 ns: at least +1 ns, else 100 MHz.
+- If the MMCM is used: its lock run in local xsim, to size the AWS test's wait.
+- The full CL's local check: every path between the two clocks under the max-delay constraint.
+
+**The prediction behind the clock choice.** Planning estimates of 2026-11-11:
+- split 2: `tb/obj_splittop8` of 2026-10-13 (P = 8, DW = 128), the testbench's memory without row-switch cost;
+- split 1: its own simulation of 0aa3cd6.
+
+| photo (12 MP) | split 1: one lane per photo, 250 MHz | split 2, controller 100 MHz | 125 MHz | 250 MHz (limit) |
+|---|---|---|---|---|
+| IMG20260716020409.jpg (1.7 MB) | 15.30 ms | 6.16 ms | 5.44 ms | 4.03 ms |
+| adapter.jpg (3.5 MB) | 24.20 ms | 11.39 ms | 9.12 ms | 5.87 ms |
+
+- These are times per photo. Split 1 decodes 15 photos at once, so it stays ahead in photos per second.
+- Pass 1 is 51-64 % of split 2's time. It runs on the controller's clock, at about 0.6 byte per clock per skimmer.
+- The estimates check out against measurements:
+  - pass 1's clocks here equal the Acorn board's (732,940 against 732,974 on adapter.jpg);
+  - the one-lane decode equals split 1's simulation to within 2 clocks.
+
 ## Where things stand (2026-11-03)
 
 - Split 1: the image is built (commit 0aa3cd6, timing met at 250 MHz with +0.015 ns, AFI afi-0385ad594097d39f3 /
@@ -34,7 +88,7 @@ started without the owner's go-ahead and a cost given first.
 | the instance idle for 34 minutes while a local check finished | ~$0.30 | every local check is finished before the launch (step 4) |
 | timing failed at placement (-0.88 ns; the local check had said +0.25) | ~$0.79 | the design rules below; the gate in `build_on_aws.sh` stops a build after placement if WNS < -0.15 ns (saves about an hour); placement `ExtraTimingOpt` |
 
-## Step 1. The owner's decisions (before any work)
+## Step 1. The owner's decisions (taken 2026-11-11: see "Decisions" above; the options as written on 11-03)
 
 1. **Clocks.** F2's main clock is 250 MHz, and the DDR4's AXI port runs on it. A's controller (pass 1, the reader,
    the lanes' composers) ran at 100 MHz on the Acorn; its pass-1 paths needed about 9 ns. Two ways:
@@ -99,7 +153,7 @@ started without the owner's go-ahead and a cost given first.
    (0x0C written 0, 1, 0) before it says ready, so that a test without it fails here, not on AWS.
 3. AWS's XSIM test, written like `cl_jpeg/verif/tests/cl_jpeg_test.sv`:
    - start the DDR4 over the statistics bus (`tb.poke_stat(.addr(8'h0c), .intf("ddr"), .data(0, then 1, then 0))`);
-     if `aws_clk_gen` is used, also the lock and reset release of step 1.1;
+     with the MMCM (Decisions, 1), its lock bit polled first (a wait sized from the local xsim run);
    - poll for at most about 1 ms of simulated time, and end at once on a failed precondition;
    - load files over PCIS, zero the output areas, read them back;
    - decode a corpus file split and one whole (`force_whole`); check the hash against the golden one.
@@ -157,7 +211,7 @@ started without the owner's go-ahead and a cost given first.
   - `fpga-load-local-image -S 0 -I <agfi>`;
   - the registers over BAR0 (OCL), the files and results over BAR4 (PCIS);
   - the host's rules for the ECC DDR4: files padded to 64-byte beats, output areas zeroed before a job;
-  - for split 2 with `aws_clk_gen`: the lock and reset release first.
+  - for split 2: the STATUS bits first (DDR4 ready; the controller's clock locked and running).
 - **The comparison:** decoder time per photo, at the same lane clock. For split 1: one photo per lane, 15 at once.
   For split 2: one photo over 8 lanes. The hashes are checked against libjpeg 9e's images; the comparison uses the
   same photos.
