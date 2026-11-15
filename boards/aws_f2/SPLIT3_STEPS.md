@@ -27,9 +27,13 @@ rules below cite AMD's model code and AWS's own designs instead.
   the IP's `MON_APB` ports, the resets `hbm_apb_preset_n_*` directly with no logic between: "Failing to connect these HBM
   monitor interfaces ... will result in an AFI creation error". AWS's example wrapper does it.
 - **AWS's wrapper** `cl/examples/cl_dram_hbm_dma/design/cl_hbm_wrapper.sv`: the IP, its 450 MHz MMCM `cl_hbm_mmcm` on
-  clk_hbm_ref, reset synchronisers, a status register (soft reset, both stacks initialised, MMCM locked) and the monitor
-  wiring; ports 0..N-1 used, the rest tied off; `AXI4_INTERFACE = 0` takes AXI3 directly. Used unmodified, read from the
-  kit by path.
+  clk_hbm_ref, reset synchronisers, a status register (soft reset, both stacks initialised; its bit 3, documented as
+  the MMCM's lock, is a constant 0 in the code) and the monitor wiring; ports 0..N-1 used, the rest tied off;
+  `AXI4_INTERFACE = 0` takes AXI3 directly. Used unmodified, read from the kit by path. **Its port w reaches the IP's
+  port 15 - w in the first stack** (w < 16; `HBM_STACK_0_MAPPING`) and port w in the second (AWS's `cl_mem_perf` has
+  its own wrapper without that reversal), and the IP's port k is next to pseudo channel k (AMD's model,
+  `hbmModel.cpp` `getSwitchLatency`: the latency grows with the quad-switch crossings |port - channel| / 4; AWS's
+  `cl_mem_perf`, ~430 GB/s on the cards, gives its port k channel k).
 - **Start-up needs no host sequence**: the soft-reset bit powers up 0, so after the shell's reset the APB reset, then the
   450 MHz reset, release; the IP initialises both stacks (`apb_complete_0/1`) and the wrapper raises `o_hbm_ready` in
   clk_main_a0. The host polls that bit before the first HBM access. The soft-reset bit is not offered to the host: it
@@ -58,20 +62,22 @@ rules below cite AMD's model code and AWS's own designs instead.
 
 - **CL `cl_jpeg_hbm`** (`boards/aws_f2/cl_hbm3/`): `cl_split.sv`'s shell side (OCL and PCIS slices, the credit links
   between the dies, `shreg_extract` off), `sh_ddr` with `DDR_PRESENT(0)`, the core, the HBM block.
-- **HBM ports** (17 of 32, decided 2026-11-15 after the advisor's review): **0 the host** (PCIS: 512-bit AXI4 -> 256-bit
-  AXI3, bursts split to 16 beats, through the switch to every channel - the one port AWS's `cl_dram_hbm_dma` uses on the
-  cards), **1-15 the batch lanes** (`mem_lane.sv`, DW 256, bursts of up to 16, inside 4 KB, already AXI3-legal), **16
-  Proposal A's shared reader** (DW 256, at 125 MHz). Lane p's files and output in pseudo channel p+1 (512 MB each,
-  channel-relative offsets: the bridge adds the channel), A's files in channel 16 (its 32-bit reader cannot reach
-  channel 15's 7.5 GB otherwise).
+- **HBM ports** (17 of 32, decided 2026-11-15 after the advisor's review; the wrapper's port numbers): **0 the host**
+  (PCIS: 512-bit AXI4 -> 256-bit AXI3, bursts split to 16 beats, through the switch to every channel - the one port AWS's
+  `cl_dram_hbm_dma` uses on the cards), **1-15 the batch lanes** (`mem_lane.sv`, DW 256, bursts of up to 16, inside 4 KB,
+  already AXI3-legal), **16 Proposal A's shared reader** (DW 256, at 125 MHz). Through the wrapper's mapping (above) the
+  host is on the IP's port 15, lane p on the IP's port 14 - p, A on port 16; so lane p's files and output are in pseudo
+  channel **14 - p** (512 MB each, channel-relative offsets: the bridge adds the channel), A's files in channel 16:
+  every lane and A in the channel next to their own port, never through the switch (step 6 first had lane p in channel
+  p + 1; the CL's HBM model, which keeps every port but the host's in its own channel, caught it).
 - **A bridge per port** (`f2h_axi3_bridge.sv`, new): the five AXI channels through `jpeg_cdc_fifo` (split 2's FIFOs),
   250 or 125 MHz on the lane's side, 450 MHz on the HBM side with one register stage at the port; 34-bit addresses
   checked. The 450 MHz side stays in SLR0 next to its port.
 - **Clocks**: clk_main_a0 250 MHz (shell ports, lanes), A's controller 125 MHz (split 2's MMCM on clk_hbm_ref), 450 MHz
   (AWS's `cl_hbm_mmcm`), clk_hbm_ref 100 MHz (HBM reference, APB, monitor).
-- **Registers (OCL)**: split 2's front (ID, VERSION 4, CLK_MHZ, STATUS with HBM ready and the MMCMs' lock, COMMIT, XERR,
-  MEM_ERR), then windows for image 1's lane registers (`f2_regs.sv`), A's registers (`f2s_cregs`) and AWS's HBM status
-  register (read-only).
+- **Registers (OCL)**: split 2's front (ID, VERSION 4, CLK_MHZ, STATUS with the HBM ready, each stack's initialisation
+  from AWS's status register, the 450 MHz side out of reset and A's MMCM locked, COMMIT, XERR, the bridges' flags), then
+  windows for image 1's lane registers (`f2_regs.sv`, two engines) and A's registers (split 2's map).
 - **Output**: the batch lanes keep both modes per job (image 1): hash only (output area 0 bytes) or every pixel written
   into HBM and read back by the host over PCIS; A hashes only (its lanes have no writer).
 - **Floorplan** (from the measured sizes, step 1: one 256-bit lane 8,564 LUTs, Proposal A at 256 bits 93,814 LUTs):
@@ -109,12 +115,31 @@ rules below cite AMD's model code and AWS's own designs instead.
   (1-64 beats, partial strobes, 16 IDs, all 32 channels) pass; the requests before the HBM is ready refused with SLVERR
   at once and counted.
 - Step 4: Proposal A at 256 bits from a clean checkout (473570a): the reader's unit test 2/2, the corpus with the
-  oracle and the fallback 70/70; the photos, restart and 4:2:0 copies running.
+  oracle and the fallback 70/70, the photos 12/12, the restart copies 8/8, the 4:2:0 copies 2/2.
 - Step 5: the batch lane at 256 bits through its bridge into the HBM model (`sim/tb_lane_hbm`, the HBM memory shared
   through `sim/f2h_hbm_mem_pkg.sv`): 2,460/2,460 jobs (the corpus, the 50 malformed files, truncations, aborts,
   padding, output overflow; four settings, one at clocks 7:4), every image = libjpeg 9e, nothing outstanding at done.
 - Found on the way: Verilator 5.003 hoists an associative array read above the `exists()` that guards it, and the read
   inserts the key (the model's words now carry a written flag instead).
+- Step 6: the whole CL in Verilator (`sim/tb_cl_hbm.cpp`, `make clh`, `run_cl_hbm_tests.py`; proposals-AB 541ff84,
+  a6f906a): the real top level with AWS's wrapper unmodified above our model of the IP (generated from its `.veo`,
+  not kept in the repository), four clocks on their own, the batch and Proposal A at the same time. From a clean
+  checkout of a6f906a (`/root/aws_f2_tools/local/run_clean_sims_s3.sh`): the unit tests of steps 2-3 20/20 as
+  expected, the lane regression 2,460/2,460, the CL 9/9 runs - five settings x (615 batch jobs + 75 Proposal A jobs)
+  (F2 clocks; 30 % PCIS gaps and HBM ready 50 %; preload at unrelated clocks; Proposal A aborted in pass 1 and rerun,
+  host latency 10; Proposal A on clk_hbm_ref with a commit stamp), Proposal A aborted in pass 2 and rerun, and three
+  negative checks that must fire (a lane's address beyond its channel: exactly its BR_FLAG bit; the same for Proposal
+  A: bit 16 and its MEM_ERR; a lane started before the HBM is initialized: the model counts it) - and the photos 4/4:
+  36 batch photo jobs (12 photos and 12 4:2:0 copies hash only on 15 lanes beside Proposal A's 12 photos split 8 ways;
+  the 24 again with every record written, read back and compared), a photo aborted in pass 2 and rerun. Every run:
+  the accesses before the HBM is ready refused and counted exactly, a sweep of every register window, every PCIS and
+  OCL access within 8 us (slowest 369 and 48 clocks of the 2,000), the HBM model's rules on every port (0 errors: no access before
+  initialization, every lane in its own channel), ports 17-31 unused, the engines' clock offset 0 and constant.
+  Found by it (fixed in 541ff84): AWS's wrapper reverses its first stack's ports (lane p was in channel p + 1, across
+  the switch; now 14 - p); the wrapper's status bit 3 ("MMCM locked") is a constant 0 (STATUS bit 1 is now the 450 MHz
+  side's reset release, bits 5:4 each stack's initialization); the front decoded only address bits 7:0; Verilator
+  5.003 writes out of bounds for the wrapper's struct arrays (`sim/cl_hbm_wrapper_sim.vlt` splits them, AWS's file
+  unchanged).
 
 ## Free steps, in order (each must pass before the next)
 
