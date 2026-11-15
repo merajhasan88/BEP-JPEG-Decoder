@@ -94,11 +94,11 @@ rules below cite AMD's model code and AWS's own designs instead.
 1. Lanes: **15 batch lanes + Proposal A's 8 (as images 1 and 2, so the three images compare)**, or more batch lanes
    (HBM has 32 ports; more area and build time).
 2. A's controller clock: **125 MHz (split 2's MMCM)**, or 100 MHz straight from clk_hbm_ref (simpler, 12-20 % slower A).
-3. Money cap: **$3** (estimate below: about $1.4-1.7 for one build that meets timing).
+3. Money cap: **$3** (estimate below; held by the instance's own power-off 320 minutes after it boots).
 4. **New PCI IDs 0xF0A3/0x1D53** (or keep one of the earlier pairs).
 5. **Proposal A's sources to the private AWS instance, the private S3 bucket and a private AFI** again (as for split 2).
 
-## Progress (2026-11-15, all free; commits on proposals-AB)
+## Progress (2026-11-15, all free; commits on proposals-AB; the commit to build: f4539443)
 
 - Step 0: development merged into proposals-AB (1f4804f).
 - Step 1: block sizes on the KU5P (synthesis): one batch lane at 256 bits 8,564 LUTs / 9,207 FFs / 4.5 BRAM / 33 DSP;
@@ -140,6 +140,64 @@ rules below cite AMD's model code and AWS's own designs instead.
   side's reset release, bits 5:4 each stack's initialization); the front decoded only address bits 7:0; Verilator
   5.003 writes out of bounds for the wrapper's struct arrays (`sim/cl_hbm_wrapper_sim.vlt` splits them, AWS's file
   unchanged).
+- Step 6 again from a clean checkout of f4539443 (after the reset fix of steps 8+9 and `REG_WREADY`): the unit tests
+  20/20 as expected, the lanes 2,460/2,460, the CL 9/9 runs, the photos 4/4. The negative check neg_early became
+  the positive check early: since 5623fdeb a lane started before the HBM is ready is held by its bridge (the HBM model
+  counts nothing before its initialization) and its bursts follow; that the model's rule fires was proven by neg_early
+  at a6f906a. XERR is still exactly as expected.
+- Step 7, local Vivado (`cl_jpeg_hbm/local_check.tcl`, run by `/root/aws_f2_tools/local/run_local_check_s3.sh
+  <commit>`; KU5P -2 standing in for the VU47P; AWS's HBM IP a black box generated from its template, everything else
+  real: AWS's wrapper unmodified, AWS's HBM MMCM as its pinned `.xci` generates it, the kit's encrypted sh_ddr and
+  sync), every stage from a clean checkout of f4539443:
+  - elab: the whole CL elaborates with three black boxes (cl_hbm and the kit's encrypted sh_ddr and sync) and two
+    MMCMs; the kit's sh_ddr with DDR_PRESENT 0 needs no AXI clock converter IP (images 1 and 2 needed two);
+  - synth: only cl_hbm a black box; the floorplan's 23 entries present, AWS's DONT_TOUCH path
+    `CL_HBM/HBM_PRESENT_EQ_1.HBM_WRAPPER_I/HBM_CORE_I` present, the HBM monitor's 184 port bits wired straight to and
+    from the IP; every timed path between the four clocks has its exception: 18,537 of ours bounded, none
+    looser than the faster clock's period (one clk_main_a0 period for the controller's crossings and the 450 MHz side's
+    reset), the 8 of AWS's two XPM reset synchronizers false (the first run, 02795c7a, found those timed as
+    ordinary paths: AWS puts the clocks into asynchronous groups, which we do not copy; false paths since 8a1b9098);
+    the bridges' 85 FIFOs; worst slack after synthesis clk_main_a0 +1.399 ns, clk_ctl +1.705
+    ns, clk_hbm_axi +0.857 ns; the dies' groups SLR0 83,438 LUTs / 122,847
+    flip-flops, SLR1 61,545 / 89,383, SLR2 95,241 / 108,100;
+    5,885 nets between the SLR0 and SLR1 groups, 308 between SLR0 and SLR2, 105 between SLR1 and SLR2;
+  - scoped (the CL linked as `WRAPPER/CL`, as AWS's `build_level_1_cl.tcl` links it): the same floorplan entries,
+    DONT_TOUCH path and monitor wiring, the shell's clocks found through the CL's pins (as gate G2 and the crossing
+    check find them on AWS), and every clock pair's paths exactly as in synth, none skipped (the crossing check counts
+    only the CL's paths once the shell is there);
+  - negclk (the clock check proven): with two of our bounds left out (the 450 MHz side's reset synchronizer, the
+    bridges' write pointers) it flags exactly the four pairs those join (main->axi 256, ctl->axi 5, axi->main 177, axi->ctl 11 paths without an exception) and
+    nothing else;
+  - neg (the structure checks proven): the real design passes, the monitor's reset through a register fails, the
+    generate block renamed fails (the DONT_TOUCH path missing);
+  - place (the HBM block alone with a stub of the IP whose ports sit in a band along the bottom edge, as the real
+    ports do): the 450 MHz side **+0.503 ns** against the gate's +0.45 ns, met; worst path g_lane[9].u_br/u_awf/rg_reg[0]/C ->
+    g_lane[9].u_br/u_aw/s_d_reg[10]/CE (3 logic levels). On the way: 64dc46aa stopped in placement (the stub's register chains had
+    become SRL16Es, which some edge slots cannot hold: the stub's registers are flip-flops since 86589ee); 86589ee's
+    worst path, -0.023 ns, was AWS's MMCM safe start, which the real build false-paths with AWS's own line (the probe
+    reads it since d2244384); that run's next path, +0.274 ns, an R FIFO's write enable, came from a placer pulled
+    towards the unfixable path, not from the design; with the exception in place the same netlist gave +0.509 ns (an R
+    FIFO's write enable again); since f4539443 the bridges' R and B FIFOs take their ready from a register
+    (`REG_WREADY`), and the forward FIFOs' read side into the register stages' enables leads at about +0.50 ns, as it
+    did at d2244384 (+0.511): the placer levels the paths there, so +0.50 is a floor of the margin, not a measure.
+    What is left on that path beyond our logic is the IP's ready outputs (flip-flops of the stub here).
+- Steps 8 and 9 in one (`/root/aws_f2_tools/local/xsim_s3/`): AWS's XSIM test itself
+  (`cl_jpeg_hbm/verif/tests/cl_jpeg_hbm_test.sv`) in 4-state xsim against the real CL, through a stand-in for AWS's
+  testbench top whose tasks (AWS's headers) drive the CL's ports, with Xilinx's MMCM, BUFG and BUFGCE models, AMD's XPM,
+  AWS's HBM MMCM, the kit's simulation sh_ddr and sync and our HBM model. Its first run (8a1b9098) found lane 14 never
+  finishing: the bridges' HBM side is reset only once AWS's MMCM runs (about 20 us), and engine hi's link latched for
+  good the X its bridge's master side had read across (Verilator's two states and the card's power-up zeros hide this;
+  AWS's XSIM gate would not have). Fixed in 5623fdeb: every bridge's master side is held in reset until the HBM is
+  ready and its 450 MHz side out of reset, and a bridge in reset takes nothing. From a clean checkout of f4539443: TEST
+  PASSED, 62 checks ok (the PCIS files read back; the batch's two lanes and Proposal A's split and restart split =
+  golden, with their pixels and sizes; every error register 0), no X in 224 reads, our model's banner in the log,
+  the HBM ready after 19 polls (21.7 us).
+- Step 10: `cl_jpeg_hbm/build_on_aws.sh` (the gates below), `package.sh`, and `/root/aws_f2_tools/image3_build.sh`
+  (outside the repositories). Its `ipcheck` passed on 11-15: AWS's IP branch head is still 6d32be97. The instance
+  powers itself off, and so terminates, 320 minutes after it boots (user data `shutdown -P +320` and the shutdown
+  behaviour terminate; `start` checks the schedule and sets it if the user data did not): at most about $2.83, whatever
+  happens on the laptop. The gates' checks are the local check's own (`build/scripts/f2h_checks.tcl`), proven on broken
+  designs by the neg and negclk stages.
 
 ## Free steps, in order (each must pass before the next)
 
@@ -179,16 +237,23 @@ rules below cite AMD's model code and AWS's own designs instead.
 - G0: just before the launch, the IP branch head = 6d32be97 (`git ls-remote` from the laptop); on the instance, the
   submodule's commit = 6d32be97 and both `.xci` files present before XSIM starts. Else stop.
 - G1: AWS's XSIM test passes (about 20 min, as split 2 with the IP compile).
-- G2, new, after synthesis and before placement, in a second Vivado beside the build on `post_synth.dcp`: AWS's log line
-  "HBM found, setting DONT_TOUCH to 0"; `hbm_apb_preset_n_0/1` reach `MON_APB_0/1_PRESET_N` with no cell between; every
-  monitor output driven - any failure or script error stops the build (an AFI would be refused). That `HBM_CORE_I` is
-  the real IP (its hard block present) cannot be tried here (no VU47P): it reports only.
+- G2, new, as soon as the HDK has linked the CL into the shell, in a second Vivado beside the build on
+  `post_link.dcp` (`build/scripts/check_gates.tcl link`): every cell the floorplan places, AWS's DONT_TOUCH path with
+  the real IP under it, the HBM monitor wired straight between the shell's ports and the IP (AWS refuses an AFI
+  otherwise) - any failure or script error stops the build. That `HBM_CORE_I` holds the real hard block cannot be
+  tried here (no VU47P): it reports only. After logic optimisation, AWS's log line "INFO: HBM found, setting
+  DONT_TOUCH to 0" must be in the build's log, or the build stops.
 - G3: after logic optimisation WNS >= -0.5 ns; G4: after placement WNS >= -0.15 ns (as splits 1 and 2).
-- After routing, if met: the crossing check on the routed design (every crossing of our cells bounded, none of ours
-  inside an exception), fetch, terminate, AFI (free), poll until available.
-- **Cost**: the instance about $0.53/h. Split 1 (15 lanes) built in 1 h 19 min, split 2 (8 lanes + controller) in
-  1 h 11 min; split 3 has both plus the HBM, so about 2-2.5 h, plus 25 min of setup and XSIM: **about $1.4-1.7** for a
-  build that meets timing, about $0.8 if a gate stops it at placement. No second paid attempt without the owner's yes.
+- After routing: a design that fails timing is not offered for an AFI; one that meets it gets the crossing check on
+  the routed design (`check_gates.tcl route`: every ordered pair of the four clocks, each of the CL's paths with its
+  exception; the shell's own reported as skipped - split 2's routed design on AWS had every clk_main_a0 <-> controller
+  path under the CL's 4 ns bound, so the shell's constraints do not override ours), then fetch at once (the instance's
+  power-off would take an unfetched checkpoint with it), terminate, AFI (free), poll until available.
+- **Cost**: the instance with its disk and address about $0.531/h. Split 1 (15 lanes) built in 1 h 19 min, split 2
+  (8 lanes + controller) in 1 h 11 min; split 3 has both plus the HBM (240k LUTs in the CL's groups after synthesis),
+  so about 2-3.25 h of build plus 30 min of setup and XSIM: **about $1.4-2.0** for a build that meets timing; stopped
+  by G1 about $0.3, by G2 or G3 about $0.6, by G4 about $1.1-1.4. **Hard cap**: the instance terminates itself 320
+  minutes after it boots (about $2.83; `image3_build.sh launch`). No second paid attempt without the owner's yes.
 
 ## Not covered before the card
 
