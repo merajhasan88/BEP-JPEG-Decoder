@@ -78,7 +78,7 @@ rules below cite AMD's model code and AWS's own designs instead.
   credit links); the 450 MHz logic and the bridges' far sides sit in SLR0 by their ports.
 - **PCIe IDs**: new for image 3 (proposed 0xF0A3/0x1D0F, 0x1D53/0xFEDC).
 
-## Decisions for the owner (defaults in bold)
+## Decisions (the owner, 2026-11-15: "defaults" - the bold ones below)
 
 1. Lanes: **15 batch lanes + Proposal A's 8 (as images 1 and 2, so the three images compare)**, or more batch lanes
    (HBM has 32 ports; more area and build time).
