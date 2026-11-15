@@ -58,14 +58,16 @@ if {$stage eq "elab"} {
   return
 }
 if {$stage eq "lane"} {
+  # the lane's data width: 512 (the DDR4, image 1) or 256 (an HBM port, split 3); environment LANE_DW
+  set ldw 512; if {[info exists ::env(LANE_DW)]} { set ldw $::env(LANE_DW) }
   set src [snapshot_decoder $rtl $out [list $f2/mem_lane.sv]]
-  prov_write $out "mem_lane AW=64 DW=512 BURST=16 WOUT=8 out of context, part $part, period $period ns" provenance_lane.txt
+  prov_write $out "mem_lane AW=64 DW=$ldw BURST=16 WOUT=8 out of context, part $part, period $period ns" provenance_lane.txt
   read_verilog -sv $src
   set fh [open $out/lane_clock.xdc w]
   puts $fh "create_clock -period $period -name clk \[get_ports clk\]"
   close $fh
   read_xdc $out/lane_clock.xdc
-  synth_design -top mem_lane -part $part -mode out_of_context -generic AW=64 -generic DW=512 -generic BURST=16 -generic WOUT=8
+  synth_design -top mem_lane -part $part -mode out_of_context -generic AW=64 -generic DW=$ldw -generic BURST=16 -generic WOUT=8
   report_utilization -file $out/utilization_lane.rpt
   write_edif -force $out/lane.edf
   return
