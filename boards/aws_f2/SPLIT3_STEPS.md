@@ -58,10 +58,12 @@ rules below cite AMD's model code and AWS's own designs instead.
 
 - **CL `cl_jpeg_hbm`** (`boards/aws_f2/cl_hbm3/`): `cl_split.sv`'s shell side (OCL and PCIS slices, the credit links
   between the dies, `shreg_extract` off), `sh_ddr` with `DDR_PRESENT(0)`, the core, the HBM block.
-- **HBM ports** (17 of 32): 0-14 the batch lanes (`mem_lane.sv`, DW 256, bursts of up to 16, inside 4 KB, already
-  AXI3-legal), 15 Proposal A's shared reader (DW 256), 16 the host (PCIS: 512-bit AXI4 -> 256-bit AXI3, bursts split to
-  16 beats). Lane p's files and output in pseudo channel p (512 MB at p x 512 MB), A's files in PC 15; the host reaches
-  every PC through the switch.
+- **HBM ports** (17 of 32, decided 2026-11-15 after the advisor's review): **0 the host** (PCIS: 512-bit AXI4 -> 256-bit
+  AXI3, bursts split to 16 beats, through the switch to every channel - the one port AWS's `cl_dram_hbm_dma` uses on the
+  cards), **1-15 the batch lanes** (`mem_lane.sv`, DW 256, bursts of up to 16, inside 4 KB, already AXI3-legal), **16
+  Proposal A's shared reader** (DW 256, at 125 MHz). Lane p's files and output in pseudo channel p+1 (512 MB each,
+  channel-relative offsets: the bridge adds the channel), A's files in channel 16 (its 32-bit reader cannot reach
+  channel 15's 7.5 GB otherwise).
 - **A bridge per port** (`f2h_axi3_bridge.sv`, new): the five AXI channels through `jpeg_cdc_fifo` (split 2's FIFOs),
   250 or 125 MHz on the lane's side, 450 MHz on the HBM side with one register stage at the port; 34-bit addresses
   checked. The 450 MHz side stays in SLR0 next to its port.
@@ -72,10 +74,13 @@ rules below cite AMD's model code and AWS's own designs instead.
   register (read-only).
 - **Output**: the batch lanes keep both modes per job (image 1): hash only (output area 0 bytes) or every pixel written
   into HBM and read back by the host over PCIS; A hashes only (its lanes have no writer).
-- **Floorplan**: from measured block sizes (step 1), not assumed. Split 1's 15 lanes were about 170k LUTs and filled
-  70 % of SLR2's CLBs (SSI spreading); the CL's part of SLR0 is about 25 clock regions against SLR2's 32, so the 15
-  lanes plus A do not fit SLR0 at a routable density. Rule: only 250 and 125 MHz signals cross an SLR (on the proven
-  credit links); the 450 MHz logic and the bridges' far sides sit in SLR0 by their ports.
+- **Floorplan** (from the measured sizes, step 1: one 256-bit lane 8,564 LUTs, Proposal A at 256 bits 93,814 LUTs):
+  the whole `CL_HBM` block (AWS's wrapper, the 17 bridges, the host's path) in `pblock_CL_SLR0` as AWS's `cl_mem_perf`
+  places its 32-port HBM logic, nothing finer; **two unchanged batch engines** (`jpeg_f2_engine`, each with its own
+  register file): 8 lanes in SLR0, 7 in SLR1 (their memory ports cross to the bridges on 256-bit credit links), only
+  the AXI-Lite link crossing to their registers; Proposal A in SLR2 (as in split 2), its reader's port crossing to SLR0
+  at 125 MHz. Only 250 and 125 MHz signals cross an SLR; nothing at 450 MHz does. The wires crossing each boundary
+  are counted against splits 1 and 2 (which routed) before the build.
 - **PCIe IDs**: new for image 3 (proposed 0xF0A3/0x1D0F, 0x1D53/0xFEDC).
 
 ## Decisions (the owner, 2026-11-15: "defaults" - the bold ones below)
@@ -86,6 +91,30 @@ rules below cite AMD's model code and AWS's own designs instead.
 3. Money cap: **$3** (estimate below: about $1.4-1.7 for one build that meets timing).
 4. **New PCI IDs 0xF0A3/0x1D53** (or keep one of the earlier pairs).
 5. **Proposal A's sources to the private AWS instance, the private S3 bucket and a private AFI** again (as for split 2).
+
+## Progress (2026-11-15, all free; commits on proposals-AB)
+
+- Step 0: development merged into proposals-AB (1f4804f).
+- Step 1: block sizes on the KU5P (synthesis): one batch lane at 256 bits 8,564 LUTs / 9,207 FFs / 4.5 BRAM / 33 DSP;
+  Proposal A at 256 bits, bursts of 16: 93,814 LUTs / 104,602 FFs / 68 BRAM / 267 DSP, its gates after synthesis passed
+  (lanes +1.401 ns at 4.0 ns, controller +4.353 ns at 8.0 ns).
+- Step 2: the bridge (`f2h_axi3_bridge.sv`) and a model of an HBM port (`sim/f2h_hbm_port_model.sv`, the rules with
+  their sources): 14 configurations x 4,000 random bursts pass (250:450 and 125:450 MHz, five off-ratio phase sweeps,
+  the HBM side released 20,000 clocks late, R stalls 0-70 %); a read across 4 KB and a bridge without its write gate
+  both fail as they must. The bridge alone on the KU5P after placement (`f2h_bridge_probe.tcl`, 473570a): the 450 MHz
+  side **+0.735 ns** (gate +0.45), the HBM pins at most 2 logic levels in and 1 out, all crossing paths under the
+  cell-scoped bounds (exactly five FIFOs found), the FIFO words in LUT RAM. (The first version's worst path, +0.573 ns,
+  ran from the write-credit compare into the W stage's enables; the compare became a register.)
+- Step 3: the host's path (`f2h_host_conv.sv` after `f2_pcis.sv`): 5 clock ratios x 3,000 random PCIS transactions
+  (1-64 beats, partial strobes, 16 IDs, all 32 channels) pass; the requests before the HBM is ready refused with SLVERR
+  at once and counted.
+- Step 4: Proposal A at 256 bits from a clean checkout (473570a): the reader's unit test 2/2, the corpus with the
+  oracle and the fallback 70/70; the photos, restart and 4:2:0 copies running.
+- Step 5: the batch lane at 256 bits through its bridge into the HBM model (`sim/tb_lane_hbm`, the HBM memory shared
+  through `sim/f2h_hbm_mem_pkg.sv`): 2,460/2,460 jobs (the corpus, the 50 malformed files, truncations, aborts,
+  padding, output overflow; four settings, one at clocks 7:4), every image = libjpeg 9e, nothing outstanding at done.
+- Found on the way: Verilator 5.003 hoists an associative array read above the `exists()` that guards it, and the read
+  inserts the key (the model's words now carry a written flag instead).
 
 ## Free steps, in order (each must pass before the next)
 
